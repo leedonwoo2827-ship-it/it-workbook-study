@@ -1,20 +1,24 @@
 roles:
   stem:
-    voice: F2
+    voice: 여성_차분          # VoiceWright voice_map에서 F3로 매핑
     speed: 1.0
     note: 차분한 여성 음성으로 문제 본문 낭독
   choices:
-    voice: F2
+    voice: 여성_차분          # F3
     speed: 1.0
     note: 보기 ①②③④ 순차 낭독
   answer:
-    voice: M3
+    voice: 남성_차분          # M3
     speed: 0.95
     note: 정답 발표는 남성 강조 음성
   explanation:
-    voice: M3
+    voice: 남성_차분          # M3
     speed: 1.0
     note: 해설은 남성 차분한 음성
+
+# 다른 음성으로 바꾸려면 위 voice 값을 아래 키 중 하나로 교체:
+#   여성: 여성_차분(F3), 여성_활기(F4), 내레이터(F2), young_female(F1), mature_female(F5)
+#   남성: 남성_차분(M3), 남성_활기(M4), young_male(M1), warm_male(M2), deep_male(M5)
 
 pronunciation:
   SELECT: 셀렉트
