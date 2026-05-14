@@ -45,6 +45,10 @@ class TTSPreviewBody(BaseModel):
     speed: float = 1.0
 
 
+class ScriptBody(BaseModel):
+    text: str
+
+
 def _cfg_path(key: str) -> Path:
     cfg = load_config()
     return PROJECT_ROOT / cfg["paths"][key]
@@ -122,9 +126,6 @@ def create_app() -> FastAPI:
             return JSONResponse(q.model_dump())
         except Exception as e:
             raise HTTPException(400, f"parse error: {e}")
-
-    class ScriptBody(BaseModel):
-        text: str
 
     @app.put("/api/script/{qid}/{scene}")
     async def api_script_save(qid: str, scene: int, body: ScriptBody) -> JSONResponse:
