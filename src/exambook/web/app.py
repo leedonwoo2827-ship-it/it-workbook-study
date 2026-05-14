@@ -123,15 +123,42 @@ def create_app() -> FastAPI:
         except Exception as e:
             raise HTTPException(400, f"parse error: {e}")
 
+    class ScriptBody(BaseModel):
+        text: str
+
+    @app.put("/api/script/{qid}/{scene}")
+    async def api_script_save(qid: str, scene: int, body: ScriptBody) -> JSONResponse:
+        from ..stage6_tts import script_override_path
+        if scene not in (1, 2):
+            raise HTTPException(400, "scene must be 1 or 2")
+        if not md_path(qid).exists():
+            raise HTTPException(404, f"{qid} not found")
+        p = script_override_path(qid, scene)
+        p.write_text(body.text, encoding="utf-8")
+        return JSONResponse({"ok": True, "path": str(p.relative_to(PROJECT_ROOT))})
+
+    @app.delete("/api/script/{qid}/{scene}")
+    async def api_script_reset(qid: str, scene: int) -> JSONResponse:
+        from ..stage6_tts import script_override_path
+        if scene not in (1, 2):
+            raise HTTPException(400, "scene must be 1 or 2")
+        p = script_override_path(qid, scene)
+        existed = p.exists()
+        if existed:
+            p.unlink()
+        return JSONResponse({"ok": True, "removed": existed})
+
     @app.get("/api/script/{qid}")
     async def api_script(qid: str) -> JSONResponse:
         """TTS에 들어가는 stem/exp 대본 + 발음 변환 segment 반환.
 
-        scenes: [{scene, label, voice, original, segments[]}]
-          segments[] = [{text, highlighted: bool, original?: str}]
-            highlighted=True 인 항목은 발음 사전에 의해 치환된 부분.
+        scenes: [{scene, label, voice, original, segments[], override_active, auto_text}]
         """
-        from ..stage6_tts import build_scripts, _qid_to_chapter
+        from ..stage6_tts import (
+            build_scripts,
+            _qid_to_chapter,
+            load_script_override,
+        )
         try:
             q = read_question(qid)
         except Exception as e:
@@ -142,10 +169,28 @@ def create_app() -> FastAPI:
         all_ids_list = list_ids()
         idx = all_ids_list.index(qid) + 1 if qid in all_ids_list else 1
 
-        # 발음 변환 *없이* 원본 스크립트만 생성
-        stem_orig, exp_orig = build_scripts(q, idx, {})
-        # 발음 변환 *적용* 스크립트
-        stem_conv, exp_conv = build_scripts(q, idx, voice_map)
+        # 자동 생성 원본 (override 없을 때의 기본)
+        auto_stem, auto_exp = build_scripts(q, idx, {})
+
+        # override 있으면 그것을 원본으로 사용
+        ov_stem = load_script_override(qid, 1)
+        ov_exp = load_script_override(qid, 2)
+        stem_orig = ov_stem if ov_stem is not None else auto_stem
+        exp_orig = ov_exp if ov_exp is not None else auto_exp
+
+        # 변환본은 위 원본에 발음 사전 적용
+        def apply_pron(text: str) -> str:
+            if not pron:
+                return text
+            out = text
+            for kw, sub in sorted(pron.items(), key=lambda kv: -len(str(kv[0]))):
+                if kw is None or sub is None:
+                    continue
+                out = re.sub(rf"\b{re.escape(str(kw))}\b", str(sub), out, flags=re.IGNORECASE)
+            return out
+
+        stem_conv = apply_pron(stem_orig)
+        exp_conv = apply_pron(exp_orig)
 
         def segment(text: str) -> list[dict]:
             if not pron:
@@ -190,6 +235,8 @@ def create_app() -> FastAPI:
                     "original": stem_orig,
                     "converted": stem_conv,
                     "segments": segment(stem_conv),
+                    "override_active": ov_stem is not None,
+                    "auto_text": auto_stem,
                 },
                 {
                     "scene": 2,
@@ -198,6 +245,8 @@ def create_app() -> FastAPI:
                     "original": exp_orig,
                     "converted": exp_conv,
                     "segments": segment(exp_conv),
+                    "override_active": ov_exp is not None,
+                    "auto_text": auto_exp,
                 },
             ],
         })

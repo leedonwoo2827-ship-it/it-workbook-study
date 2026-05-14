@@ -205,33 +205,53 @@ function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+const editing = {1: false, 2: false};       // 카드별 편집 모드 상태
+
 function drawScriptCards() {
   if (!scriptCache) return;
   const cards = scriptCache.scenes.map(sc => {
-    const body = conversionOn
-      ? sc.segments.map(seg => seg.highlighted
+    const isEditing = editing[sc.scene];
+    const overrideBadge = sc.override_active
+      ? '<span style="background:#fce7a8;color:#7a4f01;font-weight:600;padding:2px 8px;border-radius:6px;font-size:11px;margin-left:6px;">수정됨</span>'
+      : '';
+
+    let bodyHtml;
+    if (isEditing) {
+      bodyHtml = `<textarea class="md-editor" id="script-edit-${sc.scene}" style="min-height:180px;background:#fffbe6;border:1px solid #ffe082;border-radius:8px;padding:12px 14px;font-size:14px;line-height:1.65;width:100%;font-family:'SF Mono',Consolas,monospace;resize:vertical;">${escHtml(sc.original)}</textarea>`;
+    } else if (conversionOn) {
+      bodyHtml = `<div class="scene-text">${sc.segments.map(seg => seg.highlighted
           ? `<span class="pron" data-orig="${escHtml(seg.original)}" data-curr="${escHtml(seg.text)}" onclick="openPronModal(this.dataset.orig, this.dataset.curr)">${escHtml(seg.text)}</span>`
           : escHtml(seg.text)
-        ).join('')
-      : escHtml(sc.original);
+        ).join('')}</div>`;
+    } else {
+      bodyHtml = `<div class="scene-text no-conv">${escHtml(sc.original)}</div>`;
+    }
+
+    const buttons = isEditing
+      ? `<button class="scene-toggle" onclick="cancelScriptEdit(${sc.scene})">취소</button>
+         <button class="scene-toggle active" onclick="saveScriptOverride(${sc.scene})">저장</button>`
+      : `<button class="scene-toggle ${conversionOn ? 'active' : ''}" onclick="toggleConversion()">한국어 발음 전환</button>
+         <button class="scene-toggle" onclick="startScriptEdit(${sc.scene})">편집</button>
+         ${sc.override_active ? `<button class="scene-toggle" onclick="resetScriptOverride(${sc.scene})" style="color:var(--error);">원본 복원</button>` : ''}`;
+
     const audioId = `audio-sc-${sc.scene}`;
     return `
       <div class="scene-card">
         <div class="scene-header">
           <span class="scene-num">#${String(sc.scene).padStart(2,'0')}</span>
           <span class="scene-voice">${sc.voice}</span>
-          <span class="scene-label">${sc.label}</span>
+          <span class="scene-label">${sc.label}${overrideBadge}</span>
         </div>
         <div class="scene-body">
           <div class="scene-body-row">
             <span class="label">발음 (TTS 입력)</span>
-            <button class="scene-toggle ${conversionOn ? 'active' : ''}" onclick="toggleConversion()">한국어 발음 전환</button>
+            <div style="margin-left:auto;display:flex;gap:6px;">${buttons}</div>
           </div>
-          <div class="scene-text ${conversionOn ? '' : 'no-conv'}">${body}</div>
-          <div style="margin-top:12px;">
+          ${bodyHtml}
+          ${isEditing ? '' : `<div style="margin-top:12px;">
             <audio class="preview-audio" controls src="/preview/audio/${QID}/${sc.scene}?t=${Date.now()}" id="${audioId}"
                    onerror="document.getElementById('${audioId}').parentElement.innerHTML='<div style=\\'color:var(--text-faint);font-size:12px;padding:8px;\\'>(아직 음성 미생성 — [슬라이드+음성+영상] 누르세요)</div>'"></audio>
-          </div>
+          </div>`}
         </div>
       </div>`;
   }).join('');
@@ -239,9 +259,49 @@ function drawScriptCards() {
   preview.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
       <div class="preview-section-title" style="margin:0;">ch${scriptCache.chapter} · scene 2개</div>
-      <div style="font-size:12px;color:var(--text-faint);">노란 글씨 클릭 → 발음 사전 편집</div>
+      <div style="font-size:12px;color:var(--text-faint);">[편집] 직접 수정 · 노란 글씨 클릭 → 발음 사전</div>
     </div>
     ${cards}`;
+}
+
+function startScriptEdit(scene) {
+  editing[scene] = true;
+  drawScriptCards();
+}
+
+function cancelScriptEdit(scene) {
+  editing[scene] = false;
+  drawScriptCards();
+}
+
+async function saveScriptOverride(scene) {
+  const ta = document.getElementById(`script-edit-${scene}`);
+  if (!ta) return;
+  const text = ta.value;
+  showToast('저장 중…', 'info');
+  const res = await fetch(`/api/script/${QID}/${scene}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showToast('대본 저장됨 (재합성하려면 [강제 재빌드])', 'success');
+    editing[scene] = false;
+    renderScriptTab();
+  } else {
+    showToast('저장 실패', 'error');
+  }
+}
+
+async function resetScriptOverride(scene) {
+  if (!confirm(`scene ${scene} 의 사용자 편집을 지우고 자동 생성문으로 복원할까요?`)) return;
+  const res = await fetch(`/api/script/${QID}/${scene}`, {method: 'DELETE'});
+  const data = await res.json();
+  if (data.ok) {
+    showToast('원본 복원됨', 'success');
+    renderScriptTab();
+  }
 }
 
 function toggleConversion() {

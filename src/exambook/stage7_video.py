@@ -38,21 +38,36 @@ def _find_slide_pngs(png_dir: Path, qid: str) -> tuple[Path, Path]:
     raise FileNotFoundError(f"missing slide PNGs for {qid}")
 
 
+def _run_ffmpeg(cmd: list[str], context: str) -> None:
+    """ffmpeg 호출 — 실패 시 stderr 마지막 줄들을 RuntimeError 메시지로 노출."""
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        tail = "\n".join(res.stderr.splitlines()[-15:])
+        raise RuntimeError(f"ffmpeg failed ({context}): {tail}")
+
+
 def _segment(image: Path, audio: Path, out: Path, encoder: str, audio_codec: str, audio_bitrate: str, fps: int, pad: float) -> None:
-    cmd = [
+    cmd_base = lambda enc: [
         _ffmpeg(), "-y",
         "-loop", "1", "-i", str(image),
         "-i", str(audio),
         "-af", f"apad=pad_dur={pad}",
-        "-c:v", encoder,
-        "-tune", "stillimage" if encoder == "libx264" else "hq",
+        "-c:v", enc,
+        "-tune", "stillimage" if enc == "libx264" else "hq",
         "-pix_fmt", "yuv420p",
         "-r", str(fps),
         "-c:a", audio_codec, "-b:a", audio_bitrate,
         "-shortest",
         str(out),
     ]
-    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+    try:
+        _run_ffmpeg(cmd_base(encoder), f"segment {out.name} via {encoder}")
+    except RuntimeError as exc:
+        if encoder != "libx264":
+            console.print(f"[yellow]{encoder} failed → falling back to libx264[/yellow]")
+            _run_ffmpeg(cmd_base("libx264"), f"segment {out.name} via libx264 (fallback)")
+        else:
+            raise exc
 
 
 def _concat(segments: list[Path], out: Path) -> None:
@@ -62,7 +77,7 @@ def _concat(segments: list[Path], out: Path) -> None:
         encoding="utf-8",
     )
     cmd = [_ffmpeg(), "-y", "-f", "concat", "-safe", "0", "-i", str(list_file), "-c", "copy", str(out)]
-    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+    _run_ffmpeg(cmd, f"concat {out.name}")
     list_file.unlink(missing_ok=True)
 
 
