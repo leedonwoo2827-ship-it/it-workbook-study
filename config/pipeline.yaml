@@ -1,0 +1,52 @@
+project:
+  name: SQLD Exambook
+  subject: SQLD
+  language: ko
+
+models:
+  text: qwen2.5:7b
+  vision: qwen2.5vl:7b
+  embedding: jhgan/ko-sroberta-multitask
+
+paths:
+  assets: _assets
+  source_pdfs: data/source_pdfs
+  raw_pages: data/raw_pages
+  ocr: data/ocr
+  syllabus: data/syllabus/kdata_sqld.yaml
+  topic_map: data/analysis/topic_map.json
+  questions: data/questions/_index.json          # 인덱스(스냅샷). 정본은 같은 디렉토리 Q####.md
+  questions_dir: data/questions
+  variants_private: data/private/variants.json
+  slides_md: build/slides_md
+  slides_png: build/slides_png
+  audio: build/audio
+  videos: build/videos
+  prompts: prompts
+  marp_theme: themes/apple_style.css                 # 또는 themes/sqld_exam.css
+  voicewright_cli: tools\voicewright\.venv\Scripts\voicewright.exe
+
+# 절대 경로 — winget으로 설치되었지만 새 셸까지 PATH가 갱신되지 않을 때 fallback
+tools:
+  ffmpeg: C:\Users\ubion\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.1-full_build\bin\ffmpeg.exe
+  pdftoppm: C:\Users\ubion\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin\pdftoppm.exe
+
+render:
+  dpi: 300
+  slide_width: 1920
+  slide_height: 1080
+  marp_image_scale: 2
+
+generation:
+  questions_per_topic: 3
+  batch_size: 5
+  temperature_question: 0.5
+  temperature_explanation: 0.2
+  derivative_similarity_threshold: 0.75
+
+video:
+  encoder: h264_nvenc
+  audio_codec: aac
+  audio_bitrate: 192k
+  fps: 30
+  pad_silence_seconds: 1.5

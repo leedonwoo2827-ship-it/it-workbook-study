@@ -1,0 +1,40 @@
+# Source materials — never commit copyrighted PDFs
+_assets/
+data/source_pdfs/
+data/raw_pages/
+data/ocr/
+
+# Track A internal artifacts — must never be distributed
+data/private/
+
+# Generated artifacts (regeneratable)
+data/analysis/
+build/slides_md/
+build/slides_png/
+build/audio/
+build/videos/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.env
+.pytest_cache/
+*.egg-info/
+
+# Models / heavy local assets
+tools/voicewright/
+models/
+
+# Node
+node_modules/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log

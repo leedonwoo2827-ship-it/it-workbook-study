@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ qid }} — Exambook Studio</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-dot"></div>
+        <div>Exambook Studio</div>
+      </div>
+    </div>
+    <div class="sidebar-actions">
+      <a class="btn-new" href="/" style="text-align:center; display:inline-block;">← 목록으로</a>
+    </div>
+    <div class="search-wrap">
+      <input class="search" placeholder="문항 검색" id="search">
+    </div>
+    <div class="sidebar-list">
+      {% for id in all_ids %}
+        <a class="q-item {% if id == qid %}active{% endif %}" href="/q/{{ id }}">
+          <div class="q-id">{{ id }}</div>
+        </a>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>{{ qid }}</h1>
+        <span class="meta">data/questions/{{ qid }}.md</span>
+      </div>
+      <div class="toolbar">
+        <a class="btn btn-ghost" href="/pronunciations">발음 사전</a>
+        <button class="btn" onclick="save()">저장 (Ctrl+S)</button>
+        <button class="btn" onclick="rebuild(false)">슬라이드+음성+영상</button>
+        <button class="btn btn-primary" onclick="rebuild(true)">강제 재빌드</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="editor-grid">
+        <section class="editor-pane">
+          <div class="pane-header">
+            <span>편집 (Markdown)</span>
+            <span id="save-status" style="color:var(--text-faint);">unchanged</span>
+          </div>
+          <textarea class="md-editor" id="editor">{{ raw_md }}</textarea>
+        </section>
+
+        <section class="preview-pane">
+          <div class="pane-header">
+            <span>미리보기</span>
+            <div>
+              <button class="btn btn-ghost" onclick="loadPreviewMedia('slide')">슬라이드</button>
+              <button class="btn btn-ghost" onclick="loadPreviewMedia('audio')">음성</button>
+              <button class="btn btn-ghost" onclick="loadPreviewMedia('video')">영상</button>
+              <button class="btn btn-ghost" onclick="loadPreviewMedia('parsed')">파싱</button>
+            </div>
+          </div>
+          <div class="preview-body" id="preview"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const QID = "{{ qid }}";
+const editor = document.getElementById('editor');
+const saveStatus = document.getElementById('save-status');
+const preview = document.getElementById('preview');
+const toast = document.getElementById('toast');
+let dirty = false;
+
+function showToast(msg, kind='info') {
+  toast.textContent = msg;
+  toast.className = 'toast show ' + kind;
+  setTimeout(() => toast.classList.remove('show'), 2400);
+}
+
+editor.addEventListener('input', () => {
+  if (!dirty) {
+    dirty = true;
+    saveStatus.textContent = '편집됨 (저장하지 않음)';
+    saveStatus.style.color = 'var(--warning)';
+  }
+});
+
+async function save() {
+  const res = await fetch(`/api/q/${QID}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({raw_md: editor.value})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    dirty = false;
+    saveStatus.textContent = '저장됨';
+    saveStatus.style.color = 'var(--success)';
+    showToast('저장됨', 'success');
+  } else {
+    showToast('파싱 오류: ' + data.error, 'error');
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); save(); }
+});
+
+async function rebuild(force) {
+  if (dirty) await save();
+  showToast('재빌드 중…', 'info');
+  const res = await fetch('/api/rebuild', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({qids: [QID], force})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showToast('재빌드 완료', 'success');
+    loadPreviewMedia('slide');
+  } else showToast('실패: ' + data.error, 'error');
+}
+
+function loadPreviewMedia(kind) {
+  if (kind === 'slide') {
+    preview.innerHTML = `
+      <div class="preview-slide"><img src="/preview/slide/${QID}/1?t=${Date.now()}" alt="문제"></div>
+      <div class="preview-slide"><img src="/preview/slide/${QID}/2?t=${Date.now()}" alt="정답/해설"></div>`;
+  } else if (kind === 'audio') {
+    preview.innerHTML = `
+      <div class="preview-section-title">문제 본문 음성</div>
+      <audio class="preview-audio" controls src="/preview/audio/${QID}/stem?t=${Date.now()}"></audio>
+      <div class="preview-section-title">해설 음성</div>
+      <audio class="preview-audio" controls src="/preview/audio/${QID}/exp?t=${Date.now()}"></audio>`;
+  } else if (kind === 'video') {
+    preview.innerHTML = `<video class="preview-video" controls src="/preview/video/${QID}?t=${Date.now()}"></video>`;
+  } else if (kind === 'parsed') {
+    fetch(`/api/parsed/${QID}`).then(r => r.json()).then(q => {
+      const correct = q.answer_index;
+      const choices = q.choices.map((c, i) =>
+        `<li class="${i === correct ? 'correct' : ''}">${c}</li>`).join('');
+      const sql = q.sql_snippet ? `<div class="preview-section-title">SQL</div><pre class="preview-sql"><code>${q.sql_snippet}</code></pre>` : '';
+      preview.innerHTML = `
+        <div class="preview-stem">${q.stem}</div>
+        ${sql}
+        <ul class="preview-choices">${choices}</ul>
+        <div class="preview-section-title">해설</div>
+        <div class="preview-explanation">${q.explanation}</div>`;
+    }).catch(err => { preview.innerHTML = '<div class="empty">파싱 오류: ' + err + '</div>'; });
+  }
+}
+
+loadPreviewMedia('parsed');
+</script>
+</body>
+</html>

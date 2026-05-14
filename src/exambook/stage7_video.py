@@ -1,0 +1,151 @@
+"""Stage 7 — 슬라이드 PNG + 음성 WAV → MP4 (ffmpeg + NVENC).
+
+각 문항 = 2 슬라이드 페이지(문제, 정답/해설). Marp 의 멀티페이지 export 는
+`{qid}.001.png`, `{qid}.002.png` 식으로 떨어진다.
+이 두 이미지와 두 wav 를 합쳐서 문항별 mp4 한 개를 만든다.
+
+idempotent: 입력 PNG/WAV mtime <= 출력 mp4 mtime 이면 스킵.
+"""
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+from rich.console import Console
+
+from .config import PROJECT_ROOT, find_tool, load_config
+from .questions_io import list_ids
+
+console = Console()
+
+
+def _ffmpeg() -> str:
+    found = find_tool("ffmpeg")
+    if not found:
+        raise RuntimeError("ffmpeg not found. Install: winget install Gyan.FFmpeg")
+    return found
+
+
+def _find_slide_pngs(png_dir: Path, qid: str) -> tuple[Path, Path]:
+    p1 = png_dir / f"{qid}.001.png"
+    p2 = png_dir / f"{qid}.002.png"
+    if p1.exists() and p2.exists():
+        return p1, p2
+    single = png_dir / f"{qid}.png"
+    if single.exists():
+        return single, single
+    raise FileNotFoundError(f"missing slide PNGs for {qid}")
+
+
+def _segment(image: Path, audio: Path, out: Path, encoder: str, audio_codec: str, audio_bitrate: str, fps: int, pad: float) -> None:
+    cmd = [
+        _ffmpeg(), "-y",
+        "-loop", "1", "-i", str(image),
+        "-i", str(audio),
+        "-af", f"apad=pad_dur={pad}",
+        "-c:v", encoder,
+        "-tune", "stillimage" if encoder == "libx264" else "hq",
+        "-pix_fmt", "yuv420p",
+        "-r", str(fps),
+        "-c:a", audio_codec, "-b:a", audio_bitrate,
+        "-shortest",
+        str(out),
+    ]
+    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+
+
+def _concat(segments: list[Path], out: Path) -> None:
+    list_file = out.parent / f"_concat_{out.stem}.txt"
+    list_file.write_text(
+        "\n".join(f"file '{seg.as_posix()}'" for seg in segments),
+        encoding="utf-8",
+    )
+    cmd = [_ffmpeg(), "-y", "-f", "concat", "-safe", "0", "-i", str(list_file), "-c", "copy", str(out)]
+    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+    list_file.unlink(missing_ok=True)
+
+
+def _needs_rebuild(qid: str, png_dir: Path, audio_dir: Path, video_dir: Path) -> bool:
+    seg_final = video_dir / f"{qid}.mp4"
+    if not seg_final.exists():
+        return True
+    try:
+        p1, p2 = _find_slide_pngs(png_dir, qid)
+    except FileNotFoundError:
+        return False
+    stem_wav = audio_dir / f"{qid}_stem.wav"
+    exp_wav = audio_dir / f"{qid}_exp.wav"
+    if not stem_wav.exists() or not exp_wav.exists():
+        return False
+    inputs = [p1, p2, stem_wav, exp_wav]
+    in_mtime = max(p.stat().st_mtime for p in inputs)
+    return in_mtime > seg_final.stat().st_mtime
+
+
+def assemble(qids: list[str] | None = None, *, force: bool = False, concat_final: bool = True) -> Path:
+    cfg = load_config()
+    png_dir = PROJECT_ROOT / cfg["paths"]["slides_png"]
+    audio_dir = PROJECT_ROOT / cfg["paths"]["audio"]
+    video_dir = PROJECT_ROOT / cfg["paths"]["videos"]
+    video_dir.mkdir(parents=True, exist_ok=True)
+
+    encoder = cfg["video"]["encoder"]
+    audio_codec = cfg["video"]["audio_codec"]
+    audio_bitrate = cfg["video"]["audio_bitrate"]
+    fps = cfg["video"]["fps"]
+    pad = cfg["video"]["pad_silence_seconds"]
+
+    all_ids = list_ids()
+    targets = qids or all_ids
+
+    rebuilt: list[str] = []
+    for qid in targets:
+        if qid not in all_ids:
+            console.print(f"[yellow]skip {qid} — no source MD[/yellow]")
+            continue
+        if not force and not _needs_rebuild(qid, png_dir, audio_dir, video_dir):
+            console.print(f"[dim]skip {qid} — mp4 up-to-date[/dim]")
+            continue
+        try:
+            stem_png, exp_png = _find_slide_pngs(png_dir, qid)
+        except FileNotFoundError as e:
+            console.print(f"[yellow]{e}[/yellow]")
+            continue
+        stem_wav = audio_dir / f"{qid}_stem.wav"
+        exp_wav = audio_dir / f"{qid}_exp.wav"
+        if not stem_wav.exists() or not exp_wav.exists():
+            console.print(f"[yellow]missing audio for {qid}, skipping[/yellow]")
+            continue
+
+        seg_stem = video_dir / f"{qid}_stem.mp4"
+        seg_exp = video_dir / f"{qid}_exp.mp4"
+        seg_final = video_dir / f"{qid}.mp4"
+
+        _segment(stem_png, stem_wav, seg_stem, encoder, audio_codec, audio_bitrate, fps, pad)
+        _segment(exp_png, exp_wav, seg_exp, encoder, audio_codec, audio_bitrate, fps, pad)
+        _concat([seg_stem, seg_exp], seg_final)
+        seg_stem.unlink(missing_ok=True)
+        seg_exp.unlink(missing_ok=True)
+        rebuilt.append(qid)
+        console.print(f"[green]assembled[/green] {qid}.mp4")
+
+    if concat_final:
+        all_segments = [video_dir / f"{qid}.mp4" for qid in all_ids if (video_dir / f"{qid}.mp4").exists()]
+        final = video_dir / "final.mp4"
+        if all_segments:
+            if force or not final.exists() or any(s.stat().st_mtime > final.stat().st_mtime for s in all_segments):
+                _concat(all_segments, final)
+                console.print(f"[green]Final video[/green] {final}")
+            else:
+                console.print(f"[dim]final.mp4 up-to-date[/dim]")
+        return final
+
+    return video_dir
+
+
+def assemble_all() -> Path:
+    return assemble()
+
+
+if __name__ == "__main__":
+    assemble_all()

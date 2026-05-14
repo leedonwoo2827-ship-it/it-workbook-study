@@ -1,0 +1,187 @@
+/* @theme apple_style */
+/* Apple Keynote-inspired clean theme.
+   White background, ample whitespace, large display typography, subtle SF-style accent.
+   사용자가 자신만의 슬라이드.md 디자인을 가져오시면 이 파일을 그대로 교체하시거나
+   pipeline.yaml 의 paths.marp_theme 을 새 css 파일로 가리키게 하시면 됩니다. */
+
+@import 'default';
+
+:root {
+  --apple-bg: #ffffff;
+  --apple-fg: #1d1d1f;
+  --apple-muted: #6e6e73;
+  --apple-accent: #0071e3;
+  --apple-correct: #34c759;
+  --apple-card: #f5f5f7;
+  --apple-divider: #d2d2d7;
+}
+
+section {
+  background: var(--apple-bg);
+  color: var(--apple-fg);
+  font-family:
+    -apple-system, "SF Pro Display", "Apple SD Gothic Neo",
+    "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  padding: 80px 110px;
+  font-size: 30px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+section h1 {
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 36px 0;
+  border: none;
+}
+
+section.question h1 {
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--apple-muted);
+  margin-bottom: 16px;
+}
+
+section.question .stem {
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--apple-fg);
+  margin: 0 0 48px 0;
+  letter-spacing: -0.02em;
+}
+
+section.question .choices {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+section.question .choices li {
+  position: relative;
+  padding: 22px 28px 22px 80px;
+  margin-bottom: 14px;
+  background: var(--apple-card);
+  border-radius: 16px;
+  font-size: 30px;
+  font-weight: 400;
+  color: var(--apple-fg);
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+section.question .choices li::before {
+  position: absolute;
+  left: 28px;
+  top: 22px;
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--apple-accent);
+}
+
+section.question .choices li:nth-child(1)::before { content: "①"; }
+section.question .choices li:nth-child(2)::before { content: "②"; }
+section.question .choices li:nth-child(3)::before { content: "③"; }
+section.question .choices li:nth-child(4)::before { content: "④"; }
+
+section.question .choices li.correct {
+  background: rgba(52, 199, 89, 0.12);
+  border-color: rgba(52, 199, 89, 0.35);
+}
+
+section.question pre,
+section pre {
+  background: #1d1d1f;
+  color: #f5f5f7;
+  padding: 26px 30px;
+  border-radius: 18px;
+  font-size: 26px;
+  line-height: 1.45;
+  font-family: "SF Mono", "Cascadia Code", "Menlo", Consolas, monospace;
+  overflow-x: auto;
+  margin: 28px 0;
+  letter-spacing: 0;
+}
+
+section.question pre code,
+section pre code {
+  background: transparent;
+}
+
+section.question img,
+section img {
+  display: block;
+  max-width: 80%;
+  max-height: 360px;
+  margin: 28px auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+section.answer {
+  background: linear-gradient(160deg, #ffffff 0%, #f5f5f7 100%);
+}
+
+section.answer h1 {
+  font-size: 44px;
+  font-weight: 600;
+  color: var(--apple-muted);
+  margin-bottom: 32px;
+}
+
+section.answer .answer-label {
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--apple-accent);
+  margin-bottom: 40px;
+}
+
+section.answer .explanation {
+  background: #ffffff;
+  border-left: 4px solid var(--apple-accent);
+  padding: 32px 36px;
+  border-radius: 12px;
+  font-size: 28px;
+  line-height: 1.6;
+  color: var(--apple-fg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+section.title {
+  text-align: center;
+  background: #ffffff;
+}
+
+section.title h1 {
+  font-size: 96px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: var(--apple-fg);
+  margin-bottom: 24px;
+}
+
+section.title .subtitle {
+  font-size: 38px;
+  color: var(--apple-muted);
+  font-weight: 400;
+}
+
+section header {
+  color: var(--apple-muted);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+section footer {
+  color: var(--apple-muted);
+  font-size: 18px;
+  font-weight: 400;
+}
+
+section::after {
+  color: var(--apple-muted);
+  font-size: 18px;
+}

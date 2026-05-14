@@ -1,0 +1,122 @@
+/* @theme sqld_exam */
+
+@import 'default';
+
+section {
+  font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  background: #fafafa;
+  color: #1a1a1a;
+  padding: 60px 80px;
+  font-size: 28px;
+  line-height: 1.55;
+}
+
+section.question h1 {
+  font-size: 32px;
+  color: #2c5aa0;
+  border-bottom: 3px solid #2c5aa0;
+  padding-bottom: 10px;
+  margin-bottom: 30px;
+}
+
+section.question .stem {
+  font-size: 30px;
+  margin-bottom: 36px;
+  line-height: 1.6;
+}
+
+section.question .choices {
+  list-style: none;
+  padding-left: 0;
+  counter-reset: ko-choice;
+}
+
+section.question .choices li {
+  position: relative;
+  padding: 14px 18px 14px 56px;
+  margin-bottom: 14px;
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  counter-increment: ko-choice;
+}
+
+section.question .choices li::before {
+  position: absolute;
+  left: 18px;
+  top: 14px;
+  font-weight: 700;
+  color: #2c5aa0;
+}
+
+section.question .choices li:nth-child(1)::before { content: "①"; }
+section.question .choices li:nth-child(2)::before { content: "②"; }
+section.question .choices li:nth-child(3)::before { content: "③"; }
+section.question .choices li:nth-child(4)::before { content: "④"; }
+
+section.question .choices li.correct {
+  background: #fff8e1;
+  border-color: #f5b800;
+}
+
+section.question pre {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 18px 22px;
+  border-radius: 8px;
+  font-size: 24px;
+  line-height: 1.4;
+  overflow-x: auto;
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+section.question pre code .kw { color: #569cd6; }
+section.question pre code .str { color: #ce9178; }
+
+section.answer {
+  background: #fff8e1;
+}
+
+section.answer h1 {
+  color: #b45309;
+  font-size: 36px;
+}
+
+section.answer .answer-label {
+  font-size: 42px;
+  font-weight: 700;
+  color: #b45309;
+  margin-bottom: 24px;
+}
+
+section.answer .explanation {
+  font-size: 26px;
+  line-height: 1.65;
+  background: #fff;
+  padding: 24px 28px;
+  border-radius: 8px;
+  border-left: 6px solid #b45309;
+}
+
+section.title {
+  text-align: center;
+  background: linear-gradient(135deg, #2c5aa0 0%, #1e3d6f 100%);
+  color: #fff;
+}
+
+section.title h1 {
+  font-size: 64px;
+  margin: 0 0 24px 0;
+  border: none;
+  color: #fff;
+}
+
+section.title .subtitle {
+  font-size: 32px;
+  opacity: 0.9;
+}
+
+section footer {
+  font-size: 18px;
+  color: #999;
+}

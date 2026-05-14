@@ -1,0 +1,203 @@
+# KDATA SQLD 공식 출제기준 (공개 자료 기반 스타터)
+# 실제 시험 배정 비율(1과목 10문항, 2과목 40문항)을 반영하여 weight 부여
+# 이 파일은 Track B 신규생성의 유일한 표준 입력이다.
+
+subject: SQLD
+total_questions_default: 50
+
+subjects:
+  - code: "1"
+    name: 데이터 모델링의 이해
+    weight: 10
+    chapters:
+      - code: "1.1"
+        name: 데이터 모델링의 이해
+        topics:
+          - code: "1.1.1"
+            name: 데이터 모델의 이해
+            keywords: [모델링 정의, 모델링의 특징, 3가지 관점]
+          - code: "1.1.2"
+            name: 3층 스키마
+            keywords: [외부, 개념, 내부 스키마, 독립성]
+          - code: "1.1.3"
+            name: ERD
+            keywords: [표기법, IE/Barker, 작성 절차]
+      - code: "1.2"
+        name: 엔터티
+        topics:
+          - code: "1.2.1"
+            name: 엔터티의 정의와 특징
+            keywords: [업무 활용, 정보, 영속적 집합, 두 개 이상의 인스턴스]
+          - code: "1.2.2"
+            name: 엔터티의 분류
+            keywords: [유무형, 발생시점, 기본/중심/행위 엔터티]
+      - code: "1.3"
+        name: 속성
+        topics:
+          - code: "1.3.1"
+            name: 속성의 특징과 분류
+            keywords: [기본/설계/파생, 단일값, 원자값, PK 속성]
+          - code: "1.3.2"
+            name: 도메인
+            keywords: [도메인 정의, 데이터 타입과 길이]
+      - code: "1.4"
+        name: 관계
+        topics:
+          - code: "1.4.1"
+            name: 관계의 정의와 표기법
+            keywords: [관계명, 차수, 선택성, 식별/비식별]
+      - code: "1.5"
+        name: 식별자
+        topics:
+          - code: "1.5.1"
+            name: 식별자의 종류와 특징
+            keywords: [주식별자, 보조, 내부, 외부, 단일, 복합]
+          - code: "1.5.2"
+            name: 본질식별자 vs 인조식별자
+            keywords: [장단점, 비교]
+      - code: "1.6"
+        name: 정규화
+        topics:
+          - code: "1.6.1"
+            name: 정규형
+            keywords: [1NF, 2NF, 3NF, BCNF]
+          - code: "1.6.2"
+            name: 반정규화
+            keywords: [성능, 무결성, 트레이드오프]
+      - code: "1.7"
+        name: 관계와 조인의 이해
+        topics:
+          - code: "1.7.1"
+            name: 관계의 조인 변환
+            keywords: [PK-FK, 카디널리티별 조인]
+      - code: "1.8"
+        name: Null 속성의 이해
+        topics:
+          - code: "1.8.1"
+            name: Null 의 의미와 처리
+            keywords: [NULL 비교, IS NULL, NVL/COALESCE]
+      - code: "1.9"
+        name: 트랜잭션의 이해
+        topics:
+          - code: "1.9.1"
+            name: 트랜잭션 모델
+            keywords: [ACID, 일관성]
+
+  - code: "2"
+    name: SQL 기본 및 활용
+    weight: 40
+    chapters:
+      - code: "2.1"
+        name: 관계형 데이터베이스 개요
+        topics:
+          - code: "2.1.1"
+            name: SQL 종류 분류
+            keywords: [DDL, DML, DCL, TCL]
+      - code: "2.2"
+        name: SELECT 문
+        topics:
+          - code: "2.2.1"
+            name: SELECT 기본 구문
+            keywords: [컬럼, 별칭, DISTINCT, 산술식]
+          - code: "2.2.2"
+            name: ORDER BY 절
+            keywords: [정렬 순서, NULL 정렬, 컬럼번호 정렬]
+      - code: "2.3"
+        name: 함수
+        topics:
+          - code: "2.3.1"
+            name: 단일행 함수
+            keywords: [문자, 숫자, 날짜, 변환, NULL 관련]
+          - code: "2.3.2"
+            name: 다중행/그룹 함수
+            keywords: [COUNT, SUM, AVG, MIN, MAX, NULL 처리]
+      - code: "2.4"
+        name: WHERE 절
+        topics:
+          - code: "2.4.1"
+            name: 조건 연산자
+            keywords: [비교, 논리, BETWEEN, IN, LIKE, NULL 검사]
+      - code: "2.5"
+        name: GROUP BY, HAVING
+        topics:
+          - code: "2.5.1"
+            name: GROUP BY 와 HAVING
+            keywords: [집계, 그룹 조건, WHERE vs HAVING]
+      - code: "2.6"
+        name: JOIN
+        topics:
+          - code: "2.6.1"
+            name: 내부 조인
+            keywords: [INNER JOIN, EQUI, NON-EQUI, USING]
+          - code: "2.6.2"
+            name: 외부 조인
+            keywords: [LEFT, RIGHT, FULL OUTER, NULL 결과 행]
+          - code: "2.6.3"
+            name: 표준 조인 외
+            keywords: [NATURAL, CROSS]
+      - code: "2.7"
+        name: 서브쿼리
+        topics:
+          - code: "2.7.1"
+            name: 서브쿼리 분류
+            keywords: [단일행, 다중행, 다중컬럼, 상관, 인라인뷰, 스칼라]
+      - code: "2.8"
+        name: 집합 연산자
+        topics:
+          - code: "2.8.1"
+            name: 집합 연산자
+            keywords: [UNION, UNION ALL, INTERSECT, MINUS/EXCEPT]
+      - code: "2.9"
+        name: 그룹 함수
+        topics:
+          - code: "2.9.1"
+            name: ROLLUP, CUBE, GROUPING SETS
+            keywords: [소계, 총계, NULL 처리, GROUPING 함수]
+      - code: "2.10"
+        name: 윈도우 함수
+        topics:
+          - code: "2.10.1"
+            name: 윈도우 함수
+            keywords: [RANK, DENSE_RANK, ROW_NUMBER, LAG/LEAD, SUM OVER]
+      - code: "2.11"
+        name: Top N 쿼리
+        topics:
+          - code: "2.11.1"
+            name: Top N
+            keywords: [ROWNUM, FETCH FIRST, LIMIT]
+      - code: "2.12"
+        name: 계층형 질의와 셀프 조인
+        topics:
+          - code: "2.12.1"
+            name: 계층형 질의
+            keywords: [CONNECT BY, START WITH, LEVEL, SYS_CONNECT_BY_PATH]
+      - code: "2.13"
+        name: PIVOT/UNPIVOT
+        topics:
+          - code: "2.13.1"
+            name: PIVOT 절과 정규표현식
+            keywords: [PIVOT, UNPIVOT, REGEXP]
+      - code: "2.14"
+        name: DML
+        topics:
+          - code: "2.14.1"
+            name: INSERT/UPDATE/DELETE/MERGE
+            keywords: [기본 구문, 무결성, MERGE]
+      - code: "2.15"
+        name: TCL
+        topics:
+          - code: "2.15.1"
+            name: COMMIT/ROLLBACK/SAVEPOINT
+            keywords: [트랜잭션 제어]
+      - code: "2.16"
+        name: DDL
+        topics:
+          - code: "2.16.1"
+            name: CREATE/ALTER/DROP/TRUNCATE
+            keywords: [테이블, 제약조건, TRUNCATE vs DELETE]
+      - code: "2.17"
+        name: DCL
+        topics:
+          - code: "2.17.1"
+            name: GRANT/REVOKE
+            keywords: [권한, ROLE]

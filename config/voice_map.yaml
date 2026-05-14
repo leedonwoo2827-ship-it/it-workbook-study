@@ -1,0 +1,37 @@
+roles:
+  stem:
+    voice: F2
+    speed: 1.0
+    note: 차분한 여성 음성으로 문제 본문 낭독
+  choices:
+    voice: F2
+    speed: 1.0
+    note: 보기 ①②③④ 순차 낭독
+  answer:
+    voice: M3
+    speed: 0.95
+    note: 정답 발표는 남성 강조 음성
+  explanation:
+    voice: M3
+    speed: 1.0
+    note: 해설은 남성 차분한 음성
+
+pronunciation:
+  SELECT: 셀렉트
+  FROM: 프롬
+  WHERE: 웨어
+  GROUP BY: 그룹 바이
+  ORDER BY: 오더 바이
+  JOIN: 조인
+  INNER JOIN: 이너 조인
+  LEFT OUTER JOIN: 레프트 아우터 조인
+  PRIMARY KEY: 프라이머리 키
+  FOREIGN KEY: 포린 키
+  NULL: 널
+  DISTINCT: 디스팅트
+  HAVING: 해빙
+  ROWNUM: 로우넘
+  PARTITION BY: 파티션 바이
+  ROLLUP: 롤업
+  CUBE: 큐브
+  GROUPING SETS: 그루핑 셋

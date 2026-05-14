@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exambook Studio</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-dot"></div>
+        <div>Exambook Studio</div>
+      </div>
+    </div>
+    <div class="sidebar-actions">
+      <button class="btn-new" onclick="alert('terminal: exambook generate --total 50')">＋ 새 회분 생성</button>
+    </div>
+    <div class="search-wrap">
+      <input class="search" placeholder="문항 검색 (Q0042, 엔터티, …)" id="search">
+    </div>
+    <div class="sidebar-list" id="sidebar-list">
+      {% for c in cards %}
+        <a class="q-item" href="/q/{{ c.id }}">
+          <div class="q-id">{{ c.id }}</div>
+          {% if c.stem_preview %}
+            <div class="q-preview">{{ c.stem_preview }}</div>
+            <div class="q-meta">{{ c.topic_id }} · 난이도 {{ c.difficulty }}</div>
+          {% else %}
+            <div class="q-preview">ERROR: {{ c.error }}</div>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>문항 라이브러리</h1>
+        <span class="meta">총 {{ cards|length }}문항</span>
+      </div>
+      <div class="toolbar">
+        <button class="btn" onclick="rebuildAll(false)">변경분 재빌드</button>
+        <button class="btn btn-primary" onclick="rebuildAll(true)">강제 전체 재빌드</button>
+      </div>
+    </div>
+
+    <div class="content">
+      {% if cards %}
+        <div class="card-grid">
+          {% for c in cards %}
+            <div class="card" onclick="location.href='/q/{{ c.id }}'">
+              <div class="card-id">{{ c.id }}</div>
+              {% if c.stem_preview %}
+                <div class="card-stem">{{ c.stem_preview }}</div>
+                <div class="card-foot">
+                  <span class="chip">{{ c.topic_id }}</span>
+                  <span class="chip dim">난이도 {{ c.difficulty }}</span>
+                </div>
+              {% else %}
+                <div class="card-stem">파싱 오류</div>
+                <div class="card-foot"><span class="chip dim">{{ c.error[:40] }}</span></div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty">
+          <div class="empty-icon">📝</div>
+          <div>아직 생성된 문항이 없습니다.</div>
+          <div style="margin-top:8px; font-size:13px;">
+            터미널에서 <code>exambook generate --total 50</code> 을 실행해 보세요.
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const toast = $('#toast');
+function showToast(msg, kind='info') {
+  toast.textContent = msg;
+  toast.className = 'toast show ' + kind;
+  setTimeout(() => toast.classList.remove('show'), 2400);
+}
+
+document.getElementById('search').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('.q-item').forEach(el => {
+    el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
+async function rebuildAll(force) {
+  showToast('재빌드 시작…', 'info');
+  const res = await fetch('/api/rebuild', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({qids: [], force: force})
+  });
+  const data = await res.json();
+  if (data.ok) showToast('재빌드 완료', 'success');
+  else showToast('실패: ' + (data.error || 'unknown'), 'error');
+}
+</script>
+</body>
+</html>
