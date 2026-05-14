@@ -59,6 +59,7 @@
             <span>미리보기</span>
             <div>
               <button class="btn btn-ghost" onclick="loadPreviewMedia('slide')">슬라이드</button>
+              <button class="btn btn-ghost" onclick="loadPreviewMedia('script')">대본</button>
               <button class="btn btn-ghost" onclick="loadPreviewMedia('audio')">음성</button>
               <button class="btn btn-ghost" onclick="loadPreviewMedia('video')">영상</button>
               <button class="btn btn-ghost" onclick="loadPreviewMedia('parsed')">파싱</button>
@@ -136,6 +137,16 @@ function loadPreviewMedia(kind) {
     preview.innerHTML = `
       <div class="preview-slide"><img src="/preview/slide/${QID}/1?t=${Date.now()}" alt="문제"></div>
       <div class="preview-slide"><img src="/preview/slide/${QID}/2?t=${Date.now()}" alt="정답/해설"></div>`;
+  } else if (kind === 'script') {
+    fetch(`/api/script/${QID}`).then(r => r.json()).then(s => {
+      preview.innerHTML = `
+        <div class="preview-section-title">문제 본문 대본 (stem)</div>
+        <pre class="preview-sql" style="white-space:pre-wrap; background:#1d1d1f; color:#f5f5f7;">${s.stem.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre>
+        <div class="preview-section-title">해설 대본 (exp)</div>
+        <pre class="preview-sql" style="white-space:pre-wrap; background:#1d1d1f; color:#f5f5f7;">${s.exp.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre>
+        <div class="preview-section-title">참고</div>
+        <div class="preview-explanation">VoiceWright에 위 두 문자열이 그대로 입력됩니다. ①②③④, "1번 문제.", "보기.", "정답은 ③번 입니다." 같은 안내 문구는 자동 삽입. SQL 키워드(SELECT 등)는 발음 사전으로 자동 치환됨. 발음 수정은 상단 [발음 사전] 메뉴.</div>`;
+    }).catch(err => { preview.innerHTML = '<div class="empty">대본 생성 오류: ' + err + '</div>'; });
   } else if (kind === 'audio') {
     preview.innerHTML = `
       <div class="preview-section-title">문제 본문 음성</div>

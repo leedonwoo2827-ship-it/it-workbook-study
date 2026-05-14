@@ -123,6 +123,22 @@ def create_app() -> FastAPI:
         except Exception as e:
             raise HTTPException(400, f"parse error: {e}")
 
+    @app.get("/api/script/{qid}")
+    async def api_script(qid: str) -> JSONResponse:
+        """TTS에 실제로 들어가는 stem/exp 대본을 그대로 반환."""
+        from ..stage6_tts import _build_scripts
+        try:
+            q = read_question(qid)
+        except Exception as e:
+            raise HTTPException(400, f"parse error: {e}")
+        load_voice_map.cache_clear()
+        voice_map = load_voice_map()
+        all_ids_list = list_ids()
+        idx = all_ids_list.index(qid) + 1 if qid in all_ids_list else 1
+        total = len(all_ids_list) or 1
+        stem_script, exp_script = _build_scripts(q, idx, total, voice_map)
+        return JSONResponse({"stem": stem_script, "exp": exp_script})
+
     @app.get("/pronunciations", response_class=HTMLResponse)
     async def pronunciations_page(request: Request) -> HTMLResponse:
         ids = list_ids()

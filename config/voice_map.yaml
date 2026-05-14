@@ -27,7 +27,7 @@ pronunciation:
   LEFT OUTER JOIN: 레프트 아우터 조인
   PRIMARY KEY: 프라이머리 키
   FOREIGN KEY: 포린 키
-  NULL: 널
+  "NULL": 널
   DISTINCT: 디스팅트
   HAVING: 해빙
   ROWNUM: 로우넘
