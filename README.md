@@ -2,7 +2,7 @@
 
 IT 자격증(SQLD) 자동출제 + 슬라이드 영상 제작 파이프라인. 로컬 LLM(Qwen2.5) + VoiceWright TTS + Marp + ffmpeg.
 
-> 상세 문서: [docs/workflow.md](docs/workflow.md) (전체 워크플로우) · [docs/cli.md](docs/cli.md) (CLI 명령 가이드)
+> 상세 문서: [docs/01_workflow.md](docs/01_workflow.md) (전체 워크플로우) · [docs/02_cli.md](docs/02_cli.md) (CLI 명령) · [docs/03_adding_other_certifications.md](docs/03_adding_other_certifications.md) (다른 자격증 추가)
 
 ## 빠른 설치
 

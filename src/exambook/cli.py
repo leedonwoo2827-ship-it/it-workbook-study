@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -87,7 +88,7 @@ def generate(total: int = 50, seed: int = 20260514) -> None:
 
 
 @app.command()
-def variants(max_chunks: int = typer.Option(None), seed: int = 20260514) -> None:
+def variants(max_chunks: Optional[int] = None, seed: int = 20260514) -> None:
     """⚠ Track A — 개인학습용 변형. data/private/variants.json."""
     from . import stage4a_variants
     stage4a_variants.build_variants(max_chunks=max_chunks, seed=seed)
@@ -101,21 +102,21 @@ def check() -> None:
 
 
 @app.command()
-def render(force: bool = typer.Option(False, "--force", help="mtime 무시하고 강제 재렌더링")) -> None:
+def render(force: bool = False) -> None:
     """data/questions/Q####.md → Marp .md → PNG (idempotent)."""
     from . import stage5_render
     stage5_render.render_all(force=force)
 
 
 @app.command()
-def tts(force: bool = typer.Option(False, "--force")) -> None:
+def tts(force: bool = False) -> None:
     """data/questions/Q####.md → audio/*.wav via VoiceWright (idempotent)."""
     from . import stage6_tts
     stage6_tts.synthesize(force=force)
 
 
 @app.command()
-def video(force: bool = typer.Option(False, "--force")) -> None:
+def video(force: bool = False) -> None:
     """슬라이드 PNG + 음성 WAV → MP4 (NVENC, idempotent)."""
     from . import stage7_video
     stage7_video.assemble(force=force)
@@ -123,9 +124,9 @@ def video(force: bool = typer.Option(False, "--force")) -> None:
 
 @app.command()
 def rebuild(
-    qids: list[str] = typer.Argument(None, help="Q0001 Q0042 ... 비우면 전체 재빌드"),
-    force: bool = typer.Option(False, "--force"),
-    skip_video: bool = typer.Option(False, "--skip-video"),
+    qids: Optional[list[str]] = typer.Argument(None),
+    force: bool = False,
+    skip_video: bool = False,
 ) -> None:
     """편집된 Q####.md → slides → audio → mp4 까지 부분 재빌드.
 
@@ -145,11 +146,11 @@ def rebuild(
 
 @app.command()
 def serve(
-    host: str = typer.Option("127.0.0.1", "--host", help="LAN에서 보려면 0.0.0.0"),
-    port: int = typer.Option(8000, "--port"),
-    reload: bool = typer.Option(False, "--reload", help="개발 모드 (코드 변경시 자동 재시작)"),
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    reload: bool = False,
 ) -> None:
-    """로컬 웹 UI 실행 (브라우저에서 http://localhost:{port} 접속)."""
+    """로컬 웹 UI 실행 (브라우저에서 http://localhost:{port} 접속). LAN 공유: --host 0.0.0.0"""
     from .web.app import run
     console.print(f"[bold]Exambook Studio[/bold] → http://{host}:{port}")
     run(host=host, port=port, reload=reload)
