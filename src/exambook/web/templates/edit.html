@@ -74,6 +74,27 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="modal-backdrop" id="pron-modal" onclick="if(event.target===this) closePronModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>발음 사전 편집</h2>
+      <div class="modal-sub">영문/SQL 키워드를 한글 발음으로 치환. 저장 후 [음성] 탭에서 재합성하면 반영됩니다.</div>
+    </div>
+    <div class="modal-body">
+      <label>키워드 (대소문자 무시, 단어 경계 기준)</label>
+      <input id="pron-key" type="text" placeholder="예: SELECT">
+      <label>한글 발음</label>
+      <input id="pron-val" type="text" placeholder="예: 셀렉트">
+      <div id="pron-modal-msg" style="font-size:12px;color:var(--text-muted);margin-top:-6px;margin-bottom:6px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="deletePron()" id="pron-delete-btn" style="display:none;color:var(--error)">삭제</button>
+      <button class="btn" onclick="closePronModal()">취소</button>
+      <button class="btn btn-primary" onclick="savePron()">저장</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const QID = "{{ qid }}";
 const editor = document.getElementById('editor');
@@ -138,15 +159,7 @@ function loadPreviewMedia(kind) {
       <div class="preview-slide"><img src="/preview/slide/${QID}/1?t=${Date.now()}" alt="문제"></div>
       <div class="preview-slide"><img src="/preview/slide/${QID}/2?t=${Date.now()}" alt="정답/해설"></div>`;
   } else if (kind === 'script') {
-    fetch(`/api/script/${QID}`).then(r => r.json()).then(s => {
-      preview.innerHTML = `
-        <div class="preview-section-title">문제 본문 대본 (stem)</div>
-        <pre class="preview-sql" style="white-space:pre-wrap; background:#1d1d1f; color:#f5f5f7;">${s.stem.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre>
-        <div class="preview-section-title">해설 대본 (exp)</div>
-        <pre class="preview-sql" style="white-space:pre-wrap; background:#1d1d1f; color:#f5f5f7;">${s.exp.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre>
-        <div class="preview-section-title">참고</div>
-        <div class="preview-explanation">VoiceWright에 위 두 문자열이 그대로 입력됩니다. ①②③④, "1번 문제.", "보기.", "정답은 ③번 입니다." 같은 안내 문구는 자동 삽입. SQL 키워드(SELECT 등)는 발음 사전으로 자동 치환됨. 발음 수정은 상단 [발음 사전] 메뉴.</div>`;
-    }).catch(err => { preview.innerHTML = '<div class="empty">대본 생성 오류: ' + err + '</div>'; });
+    renderScriptTab();
   } else if (kind === 'audio') {
     preview.innerHTML = `
       <div class="preview-section-title">문제 본문 음성</div>
@@ -170,6 +183,134 @@ function loadPreviewMedia(kind) {
     }).catch(err => { preview.innerHTML = '<div class="empty">파싱 오류: ' + err + '</div>'; });
   }
 }
+
+// ---- 대본 탭 (VoiceWright-style) ----
+
+let scriptCache = null;       // 마지막 fetch 결과 캐시
+let conversionOn = true;       // true=발음변환 적용, false=원본
+
+async function renderScriptTab() {
+  try {
+    const res = await fetch(`/api/script/${QID}`);
+    if (!res.ok) throw new Error('script fetch failed');
+    scriptCache = await res.json();
+  } catch (err) {
+    preview.innerHTML = '<div class="empty">대본 로드 오류: ' + err + '</div>';
+    return;
+  }
+  drawScriptCards();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function drawScriptCards() {
+  if (!scriptCache) return;
+  const cards = scriptCache.scenes.map(sc => {
+    const body = conversionOn
+      ? sc.segments.map(seg => seg.highlighted
+          ? `<span class="pron" data-orig="${escHtml(seg.original)}" data-curr="${escHtml(seg.text)}" onclick="openPronModal(this.dataset.orig, this.dataset.curr)">${escHtml(seg.text)}</span>`
+          : escHtml(seg.text)
+        ).join('')
+      : escHtml(sc.original);
+    const audioId = `audio-sc-${sc.scene}`;
+    return `
+      <div class="scene-card">
+        <div class="scene-header">
+          <span class="scene-num">#${String(sc.scene).padStart(2,'0')}</span>
+          <span class="scene-voice">${sc.voice}</span>
+          <span class="scene-label">${sc.label}</span>
+        </div>
+        <div class="scene-body">
+          <div class="scene-body-row">
+            <span class="label">발음 (TTS 입력)</span>
+            <button class="scene-toggle ${conversionOn ? 'active' : ''}" onclick="toggleConversion()">한국어 발음 전환</button>
+          </div>
+          <div class="scene-text ${conversionOn ? '' : 'no-conv'}">${body}</div>
+          <div style="margin-top:12px;">
+            <audio class="preview-audio" controls src="/preview/audio/${QID}/${sc.scene}?t=${Date.now()}" id="${audioId}"
+                   onerror="document.getElementById('${audioId}').parentElement.innerHTML='<div style=\\'color:var(--text-faint);font-size:12px;padding:8px;\\'>(아직 음성 미생성 — [슬라이드+음성+영상] 누르세요)</div>'"></audio>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  preview.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="preview-section-title" style="margin:0;">ch${scriptCache.chapter} · scene 2개</div>
+      <div style="font-size:12px;color:var(--text-faint);">노란 글씨 클릭 → 발음 사전 편집</div>
+    </div>
+    ${cards}`;
+}
+
+function toggleConversion() {
+  conversionOn = !conversionOn;
+  drawScriptCards();
+}
+
+// ---- 발음 사전 모달 ----
+
+let editingKey = null;
+
+async function openPronModal(orig, curr) {
+  document.getElementById('pron-key').value = orig || '';
+  document.getElementById('pron-val').value = curr || '';
+  document.getElementById('pron-modal-msg').textContent = '';
+  document.getElementById('pron-delete-btn').style.display = orig ? 'inline-block' : 'none';
+  editingKey = orig || null;
+  document.getElementById('pron-modal').classList.add('open');
+}
+
+function closePronModal() {
+  document.getElementById('pron-modal').classList.remove('open');
+  editingKey = null;
+}
+
+async function savePron() {
+  const k = document.getElementById('pron-key').value.trim();
+  const v = document.getElementById('pron-val').value.trim();
+  if (!k || !v) {
+    document.getElementById('pron-modal-msg').textContent = '키워드와 발음을 모두 입력하세요.';
+    return;
+  }
+  const res = await fetch('/api/pronunciations');
+  const pron = await res.json();
+  if (editingKey && editingKey !== k) delete pron[editingKey];
+  pron[k] = v;
+  const r2 = await fetch('/api/pronunciations', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pron})
+  });
+  const d2 = await r2.json();
+  if (d2.ok) {
+    showToast(`발음 사전 저장 (${d2.count}개)`, 'success');
+    closePronModal();
+    renderScriptTab();
+  } else {
+    document.getElementById('pron-modal-msg').textContent = '저장 실패';
+  }
+}
+
+async function deletePron() {
+  if (!editingKey) return;
+  const res = await fetch('/api/pronunciations');
+  const pron = await res.json();
+  delete pron[editingKey];
+  await fetch('/api/pronunciations', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pron})
+  });
+  showToast('삭제됨', 'success');
+  closePronModal();
+  renderScriptTab();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePronModal();
+});
 
 loadPreviewMedia('parsed');
 </script>

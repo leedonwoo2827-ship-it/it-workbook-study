@@ -15,6 +15,7 @@ from rich.console import Console
 
 from .config import PROJECT_ROOT, find_tool, load_config
 from .questions_io import list_ids
+from .stage6_tts import narration_path
 
 console = Console()
 
@@ -65,7 +66,7 @@ def _concat(segments: list[Path], out: Path) -> None:
     list_file.unlink(missing_ok=True)
 
 
-def _needs_rebuild(qid: str, png_dir: Path, audio_dir: Path, video_dir: Path) -> bool:
+def _needs_rebuild(qid: str, png_dir: Path, video_dir: Path) -> bool:
     seg_final = video_dir / f"{qid}.mp4"
     if not seg_final.exists():
         return True
@@ -73,8 +74,8 @@ def _needs_rebuild(qid: str, png_dir: Path, audio_dir: Path, video_dir: Path) ->
         p1, p2 = _find_slide_pngs(png_dir, qid)
     except FileNotFoundError:
         return False
-    stem_wav = audio_dir / f"{qid}_stem.wav"
-    exp_wav = audio_dir / f"{qid}_exp.wav"
+    stem_wav = narration_path(qid, 1)
+    exp_wav = narration_path(qid, 2)
     if not stem_wav.exists() or not exp_wav.exists():
         return False
     inputs = [p1, p2, stem_wav, exp_wav]
@@ -85,7 +86,6 @@ def _needs_rebuild(qid: str, png_dir: Path, audio_dir: Path, video_dir: Path) ->
 def assemble(qids: list[str] | None = None, *, force: bool = False, concat_final: bool = True) -> Path:
     cfg = load_config()
     png_dir = PROJECT_ROOT / cfg["paths"]["slides_png"]
-    audio_dir = PROJECT_ROOT / cfg["paths"]["audio"]
     video_dir = PROJECT_ROOT / cfg["paths"]["videos"]
     video_dir.mkdir(parents=True, exist_ok=True)
 
@@ -103,7 +103,7 @@ def assemble(qids: list[str] | None = None, *, force: bool = False, concat_final
         if qid not in all_ids:
             console.print(f"[yellow]skip {qid} — no source MD[/yellow]")
             continue
-        if not force and not _needs_rebuild(qid, png_dir, audio_dir, video_dir):
+        if not force and not _needs_rebuild(qid, png_dir, video_dir):
             console.print(f"[dim]skip {qid} — mp4 up-to-date[/dim]")
             continue
         try:
@@ -111,8 +111,8 @@ def assemble(qids: list[str] | None = None, *, force: bool = False, concat_final
         except FileNotFoundError as e:
             console.print(f"[yellow]{e}[/yellow]")
             continue
-        stem_wav = audio_dir / f"{qid}_stem.wav"
-        exp_wav = audio_dir / f"{qid}_exp.wav"
+        stem_wav = narration_path(qid, 1)
+        exp_wav = narration_path(qid, 2)
         if not stem_wav.exists() or not exp_wav.exists():
             console.print(f"[yellow]missing audio for {qid}, skipping[/yellow]")
             continue

@@ -423,6 +423,141 @@ button { font-family: inherit; }
   margin-top: 12px;
 }
 
+/* Script (대본) cards — VoiceWright-style */
+.scene-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.scene-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-soft);
+  font-size: 13px;
+}
+.scene-num { font-weight: 700; color: var(--sky-700); }
+.scene-voice {
+  background: var(--sky-100);
+  color: var(--sky-700);
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.scene-label { color: var(--text-muted); margin-left: auto; }
+
+.scene-body { padding: 14px 16px; }
+.scene-body-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.scene-body-row .label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.scene-toggle {
+  margin-left: auto;
+  font-size: 12px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.scene-toggle:hover { border-color: var(--sky-400); color: var(--sky-700); }
+.scene-toggle.active { background: var(--sky-500); color: white; border-color: var(--sky-500); }
+
+.scene-text {
+  background: #fffbe6;
+  border: 1px solid #ffe082;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.65;
+  font-family: "SF Mono", Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.scene-text.no-conv {
+  background: #f5f5f7;
+  border-color: var(--border);
+}
+.scene-text .pron {
+  background: #ffe082;
+  color: #7a4f01;
+  border-radius: 4px;
+  padding: 1px 5px;
+  cursor: pointer;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: all 0.12s ease;
+}
+.scene-text .pron:hover {
+  border-color: #ffb300;
+  background: #ffd54f;
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 35, 60, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: white;
+  border-radius: var(--radius-lg);
+  width: min(480px, 90vw);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.modal-header {
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-header h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.modal-header .modal-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.modal-body { padding: 18px 22px; }
+.modal-body label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.modal-body input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+.modal-body input:focus { outline: none; border-color: var(--sky-400); box-shadow: 0 0 0 3px var(--sky-100); }
+.modal-footer {
+  padding: 14px 22px 18px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 /* Toast */
 .toast {
   position: fixed;

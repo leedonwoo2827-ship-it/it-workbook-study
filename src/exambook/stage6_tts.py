@@ -1,8 +1,15 @@
 """Stage 6 — VoiceWright (Supertonic) 로 문항별 음성 합성.
 
-각 문항당 두 wav:
-  build/audio/{qid}_stem.wav      (문제 본문 + 보기 ①②③④)
-  build/audio/{qid}_exp.wav       (정답 + 해설)
+사용자 워크플로 컨벤션 (scriptforge → voicewright → sceneweaver-capcut)에 맞춤.
+
+매핑 규칙:
+  Q0001(문항) → chapter "01"
+    scene 1 = stem (문제 본문 + 보기)
+    scene 2 = exp  (정답 + 해설)
+
+VoiceWright 출력:
+  <output_root>/ch{NN}/audio/ch{NN}_{scene:02d}_narration.wav
+  <output_root>/ch{NN}/subtitles/ch{NN}_{scene:02d}_narration.srt + ch{NN}.srt
 
 idempotent: 입력 MD mtime <= 출력 wav mtime 이면 스킵.
 """
@@ -22,15 +29,35 @@ from .schemas import Question
 console = Console()
 
 
+def _qid_to_chapter(qid: str) -> str:
+    """Q0001 → '01', Q0042 → '42', Q0999 → '999'.
+
+    VoiceWright의 normalize_chapter_id 는 zero-padded 2자리 이상 숫자만 받으므로
+    'Q' prefix와 leading zero 제거 후 int → str.
+    """
+    m = re.match(r"^Q(\d+)$", qid)
+    if not m:
+        raise ValueError(f"invalid qid for chapter mapping: {qid}")
+    n = int(m.group(1))
+    if n < 1 or n > 999:
+        raise ValueError(f"chapter out of range (1-999): {qid} → {n}")
+    return f"{n:02d}"
+
+
 def _apply_pronunciation(text: str, pron: dict[str, str]) -> str:
+    if not pron:
+        return text
     out = text
-    for kw, sub in sorted(pron.items(), key=lambda kv: -len(kv[0])):
-        out = re.sub(rf"\b{re.escape(kw)}\b", sub, out, flags=re.IGNORECASE)
+    for kw, sub in sorted(pron.items(), key=lambda kv: -len(str(kv[0]))):
+        if kw is None or sub is None:
+            continue
+        out = re.sub(rf"\b{re.escape(str(kw))}\b", str(sub), out, flags=re.IGNORECASE)
     return out
 
 
-def _build_scripts(q: Question, idx: int, total: int, voice_map: dict) -> tuple[str, str]:
-    pron = voice_map.get("pronunciation", {})
+def build_scripts(q: Question, idx: int, voice_map: dict) -> tuple[str, str]:
+    """문항 1개를 stem/exp 두 대본 문자열로 변환."""
+    pron = voice_map.get("pronunciation", {}) or {}
     circled = ["①", "②", "③", "④"]
 
     stem_lines = [f"{idx}번 문제."]
@@ -50,6 +77,26 @@ def _build_scripts(q: Question, idx: int, total: int, voice_map: dict) -> tuple[
     return "\n".join(stem_lines), "\n".join(exp_lines)
 
 
+# Backward compat alias
+_build_scripts = build_scripts
+
+
+def _audio_root() -> Path:
+    cfg = load_config()
+    return PROJECT_ROOT / cfg["paths"]["audio"]
+
+
+def narration_path(qid: str, scene: int) -> Path:
+    """VoiceWright가 떨어뜨릴 wav 경로 — Q####/scene → 절대 경로."""
+    chapter = _qid_to_chapter(qid)
+    return _audio_root() / f"ch{chapter}" / "audio" / f"ch{chapter}_{scene:02d}_narration.wav"
+
+
+def srt_path(qid: str, scene: int) -> Path:
+    chapter = _qid_to_chapter(qid)
+    return _audio_root() / f"ch{chapter}" / "subtitles" / f"ch{chapter}_{scene:02d}_narration.srt"
+
+
 def _voicewright_executable() -> str:
     cfg = load_config()
     configured = cfg["paths"].get("voicewright_cli")
@@ -66,12 +113,12 @@ def _voicewright_executable() -> str:
     return found
 
 
-def _needs_rebuild(qid: str, audio_dir: Path) -> bool:
+def _needs_rebuild(qid: str) -> bool:
     src = md_path(qid)
     if not src.exists():
         return False
-    stem_wav = audio_dir / f"{qid}_stem.wav"
-    exp_wav = audio_dir / f"{qid}_exp.wav"
+    stem_wav = narration_path(qid, 1)
+    exp_wav = narration_path(qid, 2)
     if not stem_wav.exists() or not exp_wav.exists():
         return True
     src_mtime = src.stat().st_mtime
@@ -79,56 +126,69 @@ def _needs_rebuild(qid: str, audio_dir: Path) -> bool:
     return src_mtime > out_mtime
 
 
-def synthesize(qids: list[str] | None = None, *, force: bool = False) -> Path:
-    cfg = load_config()
-    voice_map = load_voice_map()
-    roles = voice_map["roles"]
-    audio_dir = PROJECT_ROOT / cfg["paths"]["audio"]
-    audio_dir.mkdir(parents=True, exist_ok=True)
+def _synthesize_one(qid: str, voice_map: dict, force: bool) -> Path | None:
+    """문항 1개의 stem + exp 두 wav를 만든다. 만든 chapter 디렉토리 반환."""
+    if not force and not _needs_rebuild(qid):
+        console.print(f"[dim]skip {qid} — audio up-to-date[/dim]")
+        return None
 
     all_ids = list_ids()
-    targets = qids or all_ids
-    total = len(all_ids)
+    if qid not in all_ids:
+        console.print(f"[yellow]skip {qid} — no source MD[/yellow]")
+        return None
+    idx = all_ids.index(qid) + 1
+    q = read_question(qid)
 
-    batch_items: list[dict] = []
+    chapter = _qid_to_chapter(qid)
+    stem_script, exp_script = build_scripts(q, idx, voice_map)
+
+    roles = voice_map.get("roles", {})
+    stem_voice = (roles.get("stem", {}) or {}).get("voice", "F2")
+    exp_voice = (roles.get("explanation", {}) or {}).get("voice", "M3")
+
+    script_payload = {
+        "chapter": chapter,
+        "scenes": [
+            {
+                "scene": 1,
+                "narration_text": stem_script,
+                "voice_style": stem_voice,
+            },
+            {
+                "scene": 2,
+                "narration_text": exp_script,
+                "voice_style": exp_voice,
+            },
+        ],
+    }
+
+    audio_root = _audio_root()
+    audio_root.mkdir(parents=True, exist_ok=True)
+    script_file = audio_root / f"ch{chapter}_script.json"
+    script_file.write_text(json.dumps(script_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    cmd = [
+        _voicewright_executable(),
+        "batch",
+        str(script_file),
+        "--chapter", chapter,
+        "--output-root", str(audio_root),
+    ]
+    console.print(f"[cyan]VoiceWright[/cyan] {qid} → ch{chapter} (scenes 1,2)")
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"voicewright failed for {qid}: exit {exc.returncode}") from exc
+    return audio_root / f"ch{chapter}"
+
+
+def synthesize(qids: list[str] | None = None, *, force: bool = False) -> Path:
+    voice_map = load_voice_map()
+    targets = qids or list_ids()
     for qid in targets:
-        if qid not in all_ids:
-            console.print(f"[yellow]skip {qid} — no source MD[/yellow]")
-            continue
-        if not force and not _needs_rebuild(qid, audio_dir):
-            console.print(f"[dim]skip {qid} — audio up-to-date[/dim]")
-            continue
-        idx = all_ids.index(qid) + 1
-        q = read_question(qid)
-        stem_script, exp_script = _build_scripts(q, idx, total, voice_map)
-        stem_out = audio_dir / f"{q.id}_stem.wav"
-        exp_out = audio_dir / f"{q.id}_exp.wav"
-
-        batch_items.append({
-            "id": f"{q.id}_stem",
-            "text": stem_script,
-            "voice": roles["stem"]["voice"],
-            "speed": roles["stem"].get("speed", 1.0),
-            "output": str(stem_out),
-        })
-        batch_items.append({
-            "id": f"{q.id}_exp",
-            "text": exp_script,
-            "voice": roles["explanation"]["voice"],
-            "speed": roles["explanation"].get("speed", 1.0),
-            "output": str(exp_out),
-        })
-
-    if not batch_items:
-        console.print("[green]all audio up-to-date[/green]")
-        return audio_dir
-
-    batch_json = audio_dir / "_batch.json"
-    batch_json.write_text(json.dumps({"items": batch_items}, ensure_ascii=False, indent=2), encoding="utf-8")
-    console.print(f"[cyan]VoiceWright batch[/cyan] {len(batch_items)} clips")
-    subprocess.run([_voicewright_executable(), "batch", str(batch_json)], check=True)
-    console.print(f"[green]Audio written under[/green] {audio_dir}")
-    return audio_dir
+        _synthesize_one(qid, voice_map, force)
+    console.print(f"[green]Audio under[/green] {_audio_root()}")
+    return _audio_root()
 
 
 def synthesize_all() -> Path:

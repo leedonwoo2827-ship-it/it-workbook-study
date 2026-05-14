@@ -125,19 +125,82 @@ def create_app() -> FastAPI:
 
     @app.get("/api/script/{qid}")
     async def api_script(qid: str) -> JSONResponse:
-        """TTS에 실제로 들어가는 stem/exp 대본을 그대로 반환."""
-        from ..stage6_tts import _build_scripts
+        """TTS에 들어가는 stem/exp 대본 + 발음 변환 segment 반환.
+
+        scenes: [{scene, label, voice, original, segments[]}]
+          segments[] = [{text, highlighted: bool, original?: str}]
+            highlighted=True 인 항목은 발음 사전에 의해 치환된 부분.
+        """
+        from ..stage6_tts import build_scripts, _qid_to_chapter
         try:
             q = read_question(qid)
         except Exception as e:
             raise HTTPException(400, f"parse error: {e}")
         load_voice_map.cache_clear()
         voice_map = load_voice_map()
+        pron = voice_map.get("pronunciation", {}) or {}
         all_ids_list = list_ids()
         idx = all_ids_list.index(qid) + 1 if qid in all_ids_list else 1
-        total = len(all_ids_list) or 1
-        stem_script, exp_script = _build_scripts(q, idx, total, voice_map)
-        return JSONResponse({"stem": stem_script, "exp": exp_script})
+
+        # 발음 변환 *없이* 원본 스크립트만 생성
+        stem_orig, exp_orig = build_scripts(q, idx, {})
+        # 발음 변환 *적용* 스크립트
+        stem_conv, exp_conv = build_scripts(q, idx, voice_map)
+
+        def segment(text: str) -> list[dict]:
+            if not pron:
+                return [{"text": text, "highlighted": False}]
+            items = sorted(
+                ((str(k), str(v)) for k, v in pron.items() if k and v),
+                key=lambda kv: -len(kv[0]),
+            )
+            if not items:
+                return [{"text": text, "highlighted": False}]
+            pattern = re.compile(
+                "|".join(rf"(?P<g{i}>\b{re.escape(kw)}\b)" for i, (kw, _) in enumerate(items)),
+                re.IGNORECASE,
+            )
+            out: list[dict] = []
+            pos = 0
+            for m in pattern.finditer(text):
+                if m.start() > pos:
+                    out.append({"text": text[pos:m.start()], "highlighted": False})
+                for i, (kw, sub) in enumerate(items):
+                    if m.group(f"g{i}") is not None:
+                        out.append({"text": sub, "highlighted": True, "original": kw})
+                        break
+                pos = m.end()
+            if pos < len(text):
+                out.append({"text": text[pos:], "highlighted": False})
+            return out
+
+        roles = voice_map.get("roles", {}) or {}
+        stem_voice = (roles.get("stem", {}) or {}).get("voice", "F2")
+        exp_voice = (roles.get("explanation", {}) or {}).get("voice", "M3")
+
+        chapter = _qid_to_chapter(qid)
+        return JSONResponse({
+            "qid": qid,
+            "chapter": chapter,
+            "scenes": [
+                {
+                    "scene": 1,
+                    "label": "문제 본문",
+                    "voice": stem_voice,
+                    "original": stem_orig,
+                    "converted": stem_conv,
+                    "segments": segment(stem_conv),
+                },
+                {
+                    "scene": 2,
+                    "label": "정답 및 해설",
+                    "voice": exp_voice,
+                    "original": exp_orig,
+                    "converted": exp_conv,
+                    "segments": segment(exp_conv),
+                },
+            ],
+        })
 
     @app.get("/pronunciations", response_class=HTMLResponse)
     async def pronunciations_page(request: Request) -> HTMLResponse:
@@ -222,11 +285,13 @@ def create_app() -> FastAPI:
 
     @app.get("/preview/audio/{qid}/{kind}")
     async def preview_audio(qid: str, kind: str) -> FileResponse:
-        if kind not in {"stem", "exp"}:
-            raise HTTPException(400, "kind must be stem or exp")
-        wav = _cfg_path("audio") / f"{qid}_{kind}.wav"
+        from ..stage6_tts import narration_path
+        if kind not in {"stem", "exp", "1", "2"}:
+            raise HTTPException(400, "kind must be stem|exp|1|2")
+        scene = 1 if kind in {"stem", "1"} else 2
+        wav = narration_path(qid, scene)
         if not wav.exists():
-            raise HTTPException(404, f"audio {qid}_{kind}.wav not generated yet")
+            raise HTTPException(404, f"audio scene {scene} not generated yet")
         return FileResponse(wav, media_type="audio/wav")
 
     @app.get("/preview/video/{qid}")
