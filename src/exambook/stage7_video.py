@@ -38,9 +38,16 @@ def _find_slide_pngs(png_dir: Path, qid: str) -> tuple[Path, Path]:
     raise FileNotFoundError(f"missing slide PNGs for {qid}")
 
 
-def _run_ffmpeg(cmd: list[str], context: str) -> None:
-    """ffmpeg 호출 — 실패 시 stderr 마지막 줄들을 RuntimeError 메시지로 노출."""
-    res = subprocess.run(cmd, capture_output=True, text=True)
+def _run_ffmpeg(cmd: list[str], context: str, timeout: int = 240) -> None:
+    """ffmpeg 호출 — 실패/멈춤 시 RuntimeError.
+
+    timeout 안에 못 끝내면 강제 종료. libx264 의 단일 슬라이드+짧은 오디오 인코딩은
+    보통 30~120초 안에 끝나므로 240초면 충분.
+    """
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"ffmpeg hang ({context}) — killed after {timeout}s")
     if res.returncode != 0:
         tail = "\n".join(res.stderr.splitlines()[-15:])
         raise RuntimeError(f"ffmpeg failed ({context}): {tail}")
@@ -136,9 +143,16 @@ def assemble(qids: list[str] | None = None, *, force: bool = False, concat_final
         seg_exp = video_dir / f"{qid}_exp.mp4"
         seg_final = video_dir / f"{qid}.mp4"
 
-        _segment(stem_png, stem_wav, seg_stem, encoder, audio_codec, audio_bitrate, fps, pad)
-        _segment(exp_png, exp_wav, seg_exp, encoder, audio_codec, audio_bitrate, fps, pad)
-        _concat([seg_stem, seg_exp], seg_final)
+        try:
+            _segment(stem_png, stem_wav, seg_stem, encoder, audio_codec, audio_bitrate, fps, pad)
+            _segment(exp_png, exp_wav, seg_exp, encoder, audio_codec, audio_bitrate, fps, pad)
+            _concat([seg_stem, seg_exp], seg_final)
+        except RuntimeError as exc:
+            console.print(f"[red]Failed {qid}: {exc}[/red] — skip 후 다음 진행")
+            seg_stem.unlink(missing_ok=True)
+            seg_exp.unlink(missing_ok=True)
+            seg_final.unlink(missing_ok=True)
+            continue
         seg_stem.unlink(missing_ok=True)
         seg_exp.unlink(missing_ok=True)
         rebuilt.append(qid)

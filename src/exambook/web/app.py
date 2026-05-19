@@ -54,26 +54,71 @@ def _cfg_path(key: str) -> Path:
     return PROJECT_ROOT / cfg["paths"][key]
 
 
+def _round_from_id(qid: str) -> int:
+    m = re.match(r"^Q(\d+)-", qid)
+    return int(m.group(1)) if m else 0
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Exambook Studio", version="0.1.0")
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request) -> HTMLResponse:
+        cfg = load_config()
+        png_dir = PROJECT_ROOT / cfg["paths"]["slides_png"]
+        video_dir = PROJECT_ROOT / cfg["paths"]["videos"]
+
         ids = list_ids()
-        cards = []
+        rows = []
         for qid in ids:
+            row: dict = {"id": qid}
             try:
                 q = read_question(qid)
-                cards.append({
-                    "id": q.id,
+                row.update({
                     "topic_id": q.topic_id,
                     "difficulty": q.difficulty,
-                    "stem_preview": q.stem[:80],
+                    "stem_preview": q.stem[:120],
+                    "round": q.round or _round_from_id(qid),
                 })
             except Exception as e:
-                cards.append({"id": qid, "error": str(e)})
-        return TEMPLATES.TemplateResponse("index.html", {"request": request, "cards": cards})
+                row.update({"error": str(e), "round": _round_from_id(qid)})
+            slide_done = (png_dir / f"{qid}.png").exists() or any(png_dir.glob(f"{qid}.*.png"))
+            video_done = (video_dir / f"{qid}.mp4").exists()
+            row["slide_done"] = slide_done
+            row["video_done"] = video_done
+            rows.append(row)
+
+        # 회차별 그룹
+        groups: dict[int, list[dict]] = {}
+        for r in rows:
+            groups.setdefault(r["round"] or 0, []).append(r)
+        group_list = []
+        for round_n in sorted(groups.keys()):
+            items = groups[round_n]
+            group_list.append({
+                "round": round_n,
+                "label": f"Q{round_n}" if round_n else "기타",
+                "rows": items,
+                "total": len(items),
+                "slide_done": sum(1 for r in items if r.get("slide_done")),
+                "video_done": sum(1 for r in items if r.get("video_done")),
+            })
+
+        total = len(rows)
+        slide_total = sum(1 for r in rows if r.get("slide_done"))
+        video_total = sum(1 for r in rows if r.get("video_done"))
+        summary = {
+            "total": total,
+            "slide_done": slide_total,
+            "video_done": video_total,
+            "slide_pct": round(100 * slide_total / total) if total else 0,
+            "video_pct": round(100 * video_total / total) if total else 0,
+        }
+        return TEMPLATES.TemplateResponse(
+            "index.html",
+            {"request": request, "groups": group_list, "summary": summary},
+        )
 
     @app.get("/q/{qid}", response_class=HTMLResponse)
     async def question_page(request: Request, qid: str) -> HTMLResponse:

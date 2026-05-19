@@ -7,6 +7,11 @@ data/ocr/
 # Track A internal artifacts — must never be distributed
 data/private/
 
+# Track B 생성 문항 — KDATA 출제기준 기반 LLM 파생물.
+# 라이선스/배포 이슈 + 재생성 가능하므로 소스 레포에는 올리지 않음.
+# 로컬에서 `exambook generate --total 200 --rounds 4` 등으로 재생성.
+data/questions/
+
 # Generated artifacts (regeneratable)
 data/analysis/
 build/slides_md/

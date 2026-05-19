@@ -22,9 +22,9 @@ section {
   font-family:
     -apple-system, "SF Pro Display", "Apple SD Gothic Neo",
     "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
-  padding: 80px 110px;
-  font-size: 30px;
-  line-height: 1.5;
+  padding: 50px 70px;
+  font-size: 24px;
+  line-height: 1.45;
   letter-spacing: -0.01em;
 }
 
@@ -37,18 +37,18 @@ section h1 {
 }
 
 section.question h1 {
-  font-size: 36px;
+  font-size: 26px;
   font-weight: 600;
   color: var(--apple-muted);
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 section.question .stem {
-  font-size: 40px;
+  font-size: 28px;
   font-weight: 600;
   line-height: 1.35;
   color: var(--apple-fg);
-  margin: 0 0 48px 0;
+  margin: 0 0 22px 0;
   letter-spacing: -0.02em;
 }
 
@@ -60,22 +60,23 @@ section.question .choices {
 
 section.question .choices li {
   position: relative;
-  padding: 22px 28px 22px 80px;
-  margin-bottom: 14px;
+  padding: 12px 18px 12px 56px;
+  margin-bottom: 8px;
   background: var(--apple-card);
-  border-radius: 16px;
-  font-size: 30px;
+  border-radius: 10px;
+  font-size: 22px;
   font-weight: 400;
   color: var(--apple-fg);
   border: 1px solid transparent;
   transition: border-color 0.2s ease;
+  line-height: 1.4;
 }
 
 section.question .choices li::before {
   position: absolute;
-  left: 28px;
-  top: 22px;
-  font-size: 30px;
+  left: 20px;
+  top: 12px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--apple-accent);
 }
@@ -94,19 +95,71 @@ section.question pre,
 section pre {
   background: #1d1d1f;
   color: #f5f5f7;
-  padding: 26px 30px;
-  border-radius: 18px;
-  font-size: 26px;
-  line-height: 1.45;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 18px;
+  line-height: 1.4;
   font-family: "SF Mono", "Cascadia Code", "Menlo", Consolas, monospace;
   overflow-x: auto;
-  margin: 28px 0;
+  margin: 12px 0 18px 0;
   letter-spacing: 0;
+}
+
+section.question .choices li {
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 section.question pre code,
 section pre code {
   background: transparent;
+}
+
+/* 다크 코드블록 위 syntax highlight 가독성 (GitHub Dark 계열 고대비 팔레트).
+   기본 hljs 다크 토큰은 문자열을 어두운 파랑으로 칠해 #1d1d1f 배경 위에서 잘 안 보임. */
+section pre code.hljs,
+section pre code {
+  color: #f5f5f7;
+}
+section pre .hljs-keyword,
+section pre .hljs-selector-tag,
+section pre .hljs-literal,
+section pre .hljs-section,
+section pre .hljs-link {
+  color: #ff7b72;
+}
+section pre .hljs-string,
+section pre .hljs-attr,
+section pre .hljs-symbol,
+section pre .hljs-bullet,
+section pre .hljs-addition {
+  color: #ffd866;
+}
+section pre .hljs-number,
+section pre .hljs-meta,
+section pre .hljs-built_in,
+section pre .hljs-builtin-name,
+section pre .hljs-type,
+section pre .hljs-params {
+  color: #79c0ff;
+}
+section pre .hljs-title,
+section pre .hljs-name,
+section pre .hljs-attribute,
+section pre .hljs-function .hljs-title,
+section pre .hljs-title.function_ {
+  color: #d2a8ff;
+}
+section pre .hljs-comment,
+section pre .hljs-quote,
+section pre .hljs-deletion {
+  color: #8b949e;
+  font-style: italic;
+}
+section pre .hljs-variable,
+section pre .hljs-template-variable,
+section pre .hljs-regexp {
+  color: #ffa657;
 }
 
 section.question img,
@@ -124,29 +177,79 @@ section.answer {
 }
 
 section.answer h1 {
-  font-size: 44px;
+  font-size: 26px;
   font-weight: 600;
   color: var(--apple-muted);
-  margin-bottom: 32px;
+  margin-bottom: 14px;
 }
 
 section.answer .answer-label {
-  font-size: 56px;
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   color: var(--apple-accent);
-  margin-bottom: 40px;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+section.answer .stem {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--apple-fg);
+  margin: 0 0 12px 0;
+  letter-spacing: -0.01em;
+}
+
+section.answer .choices {
+  list-style: none;
+  padding-left: 0;
+  margin: 10px 0 14px 0;
+}
+section.answer .choices li {
+  position: relative;
+  padding: 10px 16px 10px 52px;
+  margin-bottom: 6px;
+  background: var(--apple-card);
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--apple-fg);
+  border: 1px solid transparent;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+section.answer .choices li::before {
+  position: absolute;
+  left: 18px;
+  top: 8px;
+  font-size: 22px;
+  font-weight: 700;
+}
+section.answer .choices li.correct-mark::before {
+  content: "○";
+  color: var(--apple-correct);
+}
+section.answer .choices li.wrong-mark::before {
+  content: "✕";
+  color: #d70015;
+}
+section.answer .choices li.correct-mark {
+  background: rgba(52, 199, 89, 0.10);
+  border-color: rgba(52, 199, 89, 0.30);
 }
 
 section.answer .explanation {
   background: #ffffff;
   border-left: 4px solid var(--apple-accent);
-  padding: 32px 36px;
-  border-radius: 12px;
-  font-size: 28px;
-  line-height: 1.6;
+  padding: 16px 20px;
+  border-radius: 10px;
+  font-size: 19px;
+  line-height: 1.55;
   color: var(--apple-fg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  word-break: break-word;
 }
 
 section.title {

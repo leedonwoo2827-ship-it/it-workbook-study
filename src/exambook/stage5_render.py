@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import html
+import re
 import subprocess
 from pathlib import Path
 
@@ -22,6 +23,63 @@ console = Console()
 
 def _escape(text: str) -> str:
     return html.escape(text, quote=False)
+
+
+_FENCE_RE = re.compile(r"```[a-zA-Z]*\n.*?\n```", re.DOTALL)
+
+_NEGATIVE_MARKERS = (
+    "옳지 않은", "옳지않은", "옳지 않는", "옳지않는",
+    "잘못된", "틀린", "아닌 것", "아닌것",
+    "올바르지 않", "맞지 않", "거리가 먼", "해당하지 않",
+)
+
+_BULLET_SPLIT_RE = re.compile(r"\n[-*]\s")
+
+_SENTENCE_END_RE = re.compile(r"[.!?][\s\n]+")
+
+
+def _is_negative_question(stem: str) -> bool:
+    return any(m in stem for m in _NEGATIVE_MARKERS)
+
+
+def _strip_question_sentence(text: str) -> str:
+    """발문(마지막 의문문 문장) 제거. 단문 의문문이면 빈 문자열 반환.
+
+    Korean stems often combine 지문(supporting text) + 발문(the interrogative).
+    On slide 2 (정답·해설) 우리는 발문만 떼어내 지문을 남긴다.
+    """
+    text = text.strip()
+    if not (text.endswith("?") or text.endswith("？")):
+        return text
+    matches = list(_SENTENCE_END_RE.finditer(text))
+    if not matches:
+        return ""
+    return text[: matches[-1].end()].rstrip()
+
+
+def _brief_explanation(text: str) -> str:
+    """첫 단락 + (단락이 짧으면) 첫 bullet, 280자 캡."""
+    text = text.strip()
+    parts = _BULLET_SPLIT_RE.split(text, maxsplit=1)
+    intro = parts[0].strip()
+    if len(intro) < 80 and len(parts) > 1:
+        first_bullet = parts[1].split("\n", 1)[0].strip()
+        intro = f"{intro}\n• {first_bullet}"
+    if len(intro) > 280:
+        intro = intro[:280].rstrip() + "…"
+    return intro
+
+
+def _split_stem_code(stem: str) -> tuple[str, list[str]]:
+    """stem 안의 ```...``` 펜스 코드블록을 추출해서 (stem 본문, [코드블록…]) 반환.
+
+    LLM이 종종 stem 안에 SQL 코드를 박는데, `<div class="stem">…</div>` 로 감싸면
+    펜스 닫는 백틱이 `</div>` 와 한 줄에 붙어 코드블록이 안 닫힘 → 뒤 페이지 전체가
+    코드 안 텍스트로 흡수되어 슬라이드 분리(`---`)가 무효화됨.
+    """
+    blocks = _FENCE_RE.findall(stem)
+    body = _FENCE_RE.sub("", stem).strip()
+    return body, blocks
 
 
 def _image_block(qid: str, base_dir: Path) -> str:
@@ -43,9 +101,44 @@ def _render_marp_md(q: Question, idx: int, total: int, theme: str, build_md_dir:
     )
     images = _image_block(q.id, build_md_dir)
 
-    sql_block = ""
+    stem_body, embedded_codes = _split_stem_code(q.stem)
+
+    def _inner(block: str) -> str:
+        # ```lang\n…\n``` 에서 본문만 추출
+        lines = block.strip().splitlines()
+        if len(lines) >= 2 and lines[0].startswith("```") and lines[-1].startswith("```"):
+            return "\n".join(lines[1:-1]).strip()
+        return block.strip()
+
+    code_blocks: list[str] = []
+    seen: set[str] = set()
     if q.sql_snippet:
-        sql_block = f"\n```sql\n{q.sql_snippet}\n```\n"
+        snippet = q.sql_snippet.strip()
+        code_blocks.append(f"```sql\n{snippet}\n```")
+        seen.add(snippet)
+    for emb in embedded_codes:
+        body = _inner(emb)
+        if body in seen:
+            continue
+        seen.add(body)
+        code_blocks.append(emb)
+    sql_block = ("\n" + "\n\n".join(code_blocks) + "\n") if code_blocks else ""
+
+    negative = _is_negative_question(q.stem)
+    def _stmt_mark_class(i: int) -> str:
+        is_true_statement = (i != correct) if negative else (i == correct)
+        return "correct-mark" if is_true_statement else "wrong-mark"
+
+    answer_choice_items = "\n".join(
+        f'  <li class="{_stmt_mark_class(i)}">{_escape(c)}</li>'
+        for i, c in enumerate(q.choices)
+    )
+    answer_stem_body = _strip_question_sentence(stem_body)
+    answer_stem_html = (
+        f'<div class="stem">{_escape(answer_stem_body)}</div>\n'
+        if answer_stem_body else ""
+    )
+    brief_html = _escape(_brief_explanation(q.explanation)).replace("\n", "<br>")
 
     md = f"""---
 marp: true
@@ -59,7 +152,7 @@ footer: '난이도 {q.difficulty} · {q.syllabus_ref}'
 
 # 문제 {idx}
 
-<div class="stem">{_escape(q.stem)}</div>
+<div class="stem">{_escape(stem_body)}</div>
 {images}{sql_block}
 <ul class="choices">
 {choice_items.replace(' class=""', '')}
@@ -71,9 +164,12 @@ footer: '난이도 {q.difficulty} · {q.syllabus_ref}'
 
 # 정답 및 해설
 
-<div class="answer-label">정답: {['①','②','③','④'][correct]} {_escape(q.choices[correct])}</div>
+{answer_stem_html}{sql_block}
+<ul class="choices">
+{answer_choice_items}
+</ul>
 
-<div class="explanation">{_escape(q.explanation)}</div>
+<div class="explanation">{brief_html}</div>
 """
     return md
 

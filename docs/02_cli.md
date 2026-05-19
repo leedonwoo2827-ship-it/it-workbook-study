@@ -75,17 +75,32 @@ OCR 결과를 Qwen2.5-7B로 분석해 **카테고리·빈도·난이도·함정 
 ### `generate`
 
 ```bash
-exambook generate --total 50           # 1회분 (기본)
-exambook generate --total 100          # 2회분
-exambook generate --total 200 --seed 42
+exambook generate --total 50                  # 1회분 50문항 → Q1-01..Q1-50
+exambook generate --total 200 --rounds 4      # 4회분 50문항씩 → Q1-01..Q4-50
+exambook generate --total 100 --rounds 2 --seed 42
 ```
 
 KDATA 공개 출제기준(`data/syllabus/kdata_sqld.yaml`)과 `topic_map.json` 추상 통계만 입력으로
-신규 4지선다 문항을 생성. self-critique 자체검증 통과한 것만 `data/questions/Q####.md`로 저장.
+신규 4지선다 문항을 생성. self-critique 자체검증 통과한 것만 `data/questions/Q{round}-{idx}.md`로 저장.
 
-- 1과목(데이터 모델링) : 2과목(SQL) = 1 : 4 비율 자동 적용
-- 토픽별로 batch 호출
-- `--seed` 로 재현성 확보
+- **회차 ID 포맷**: `Q{round}-{round_idx:02d}` 예: `Q1-01`, `Q3-27`, `Q4-50`
+- frontmatter 에 `round`, `round_idx` 필드 저장됨
+- 1과목(데이터 모델링) : 2과목(SQL) = 1 : 4 비율 자동 적용 (회차마다 동일)
+- 회차별로 다른 시드 사용 → 회차마다 다른 문항
+- `--seed` 로 전체 재현성 확보
+- 폐기(self-critique reject)된 자리는 비어둠 — 회차당 50문항 목표지만 실제 45-50개 정도 떨어질 수 있음
+
+### 회차 ID → VoiceWright chapter 매핑
+
+| 문항 ID | chapter (wav 디렉토리) | 영상 파일 |
+|---|---|---|
+| `Q1-01` ~ `Q1-50` | `ch01` ~ `ch50` | `Q1-01.mp4` ~ |
+| `Q2-01` ~ `Q2-50` | `ch51` ~ `ch100` | |
+| `Q3-01` ~ `Q3-50` | `ch101` ~ `ch150` | |
+| `Q4-01` ~ `Q4-50` | `ch151` ~ `ch200` | ~ `Q4-50.mp4` |
+
+음성 파일은 `build/audio/ch{NN}/audio/ch{NN}_{scene:02d}_narration.wav`,
+영상은 `build/videos/Q{round}-{idx}.mp4`.
 
 ### `check`
 

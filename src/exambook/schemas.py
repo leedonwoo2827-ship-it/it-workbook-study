@@ -57,6 +57,8 @@ class Question(BaseModel):
     generated_by: str
     self_critique_passed: bool = False
     derivative_max_similarity: Optional[confloat(ge=0.0, le=1.0)] = None
+    round: Optional[conint(ge=1, le=99)] = None
+    round_idx: Optional[conint(ge=1, le=999)] = None
 
 
 class QuestionBank(BaseModel):

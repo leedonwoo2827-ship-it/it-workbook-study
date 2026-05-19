@@ -30,18 +30,41 @@ console = Console()
 
 
 def _qid_to_chapter(qid: str) -> str:
-    """Q0001 → '01', Q0042 → '42', Q0999 → '999'.
+    """문항 ID → VoiceWright chapter 번호('01'..'999').
 
-    VoiceWright의 normalize_chapter_id 는 zero-padded 2자리 이상 숫자만 받으므로
-    'Q' prefix와 leading zero 제거 후 int → str.
+    매핑 우선순위:
+      - 회차 ID `Q{round}-{idx}` (예: Q1-01, Q4-50) → (round-1)*50 + idx
+      - 순번 ID `Q0001` → 그 숫자 그대로
+      - 해시 ID `Q005e89bf5f` (legacy) → 현재 list_ids() 내 순번(1-based)
+    VoiceWright normalize_chapter_id 가 1-999 zero-padded 만 받기 때문에
+    어떤 형태든 결정론적으로 정수 1-999 로 매핑한다.
     """
+    # Q{round}-{round_idx}
+    m = re.match(r"^Q(\d+)-(\d+)$", qid)
+    if m:
+        round_n = int(m.group(1))
+        round_idx = int(m.group(2))
+        chapter_num = (round_n - 1) * 50 + round_idx
+        if 1 <= chapter_num <= 999:
+            return f"{chapter_num:02d}"
+        raise ValueError(f"chapter out of range (1-999): {qid} → {chapter_num}")
+
+    # Q####
     m = re.match(r"^Q(\d+)$", qid)
-    if not m:
-        raise ValueError(f"invalid qid for chapter mapping: {qid}")
-    n = int(m.group(1))
-    if n < 1 or n > 999:
-        raise ValueError(f"chapter out of range (1-999): {qid} → {n}")
-    return f"{n:02d}"
+    if m:
+        n = int(m.group(1))
+        if 1 <= n <= 999:
+            return f"{n:02d}"
+
+    # legacy hash ID
+    all_ids = list_ids()
+    if qid in all_ids:
+        idx = all_ids.index(qid) + 1
+        if 1 <= idx <= 999:
+            return f"{idx:02d}"
+        raise ValueError(f"chapter out of range (1-999): {qid} → idx {idx}")
+
+    raise ValueError(f"invalid qid for chapter mapping: {qid}")
 
 
 def _apply_pronunciation(text: str, pron: dict[str, str]) -> str:
@@ -156,10 +179,12 @@ def _synthesize_one(qid: str, voice_map: dict, force: bool) -> Path | None:
 
     ov1 = load_script_override(qid, 1)
     ov2 = load_script_override(qid, 2)
-    stem_script = ov1 if ov1 is not None else auto_stem
-    exp_script = ov2 if ov2 is not None else auto_exp
+    pron = voice_map.get("pronunciation", {}) or {}
+    stem_script = _apply_pronunciation(ov1, pron) if ov1 is not None else auto_stem
+    exp_script = _apply_pronunciation(ov2, pron) if ov2 is not None else auto_exp
     if ov1 is not None or ov2 is not None:
-        console.print(f"[dim]using override for {qid} (scene {','.join(s for s, ov in [('1', ov1), ('2', ov2)] if ov is not None)})[/dim]")
+        used_scenes = ",".join(s for s, ov in [("1", ov1), ("2", ov2)] if ov is not None)
+        console.print(f"[dim]using narration sidecar for {qid} (scene {used_scenes})[/dim]")
 
     roles = voice_map.get("roles", {})
     stem_voice = (roles.get("stem", {}) or {}).get("voice", "F2")

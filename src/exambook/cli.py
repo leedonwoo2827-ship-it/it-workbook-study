@@ -81,10 +81,15 @@ def topics() -> None:
 
 
 @app.command()
-def generate(total: int = 50, seed: int = 20260514) -> None:
-    """KDATA syllabus + topic_map → data/questions/questions.json (Track B)."""
+def generate(total: int = 50, seed: int = 20260514, rounds: int = 1) -> None:
+    """KDATA syllabus + topic_map → data/questions/Q{round}-{idx}.md (Track B).
+
+    예:
+      exambook generate --total 50                  # 1회분 50문항 → Q1-01..Q1-50
+      exambook generate --total 200 --rounds 4      # 4회분 50문항씩 → Q1-01..Q4-50
+    """
     from . import stage4b_generate
-    stage4b_generate.generate_bank(total=total, seed=seed)
+    stage4b_generate.generate_bank(total=total, seed=seed, rounds=rounds)
 
 
 @app.command()
@@ -99,6 +104,17 @@ def check() -> None:
     """배포 전 의무 게이트 — derivative similarity check."""
     cmd = [sys.executable, str(PROJECT_ROOT / "tests" / "derivative_check.py")]
     raise SystemExit(subprocess.call(cmd))
+
+
+@app.command()
+def narrate(force: bool = False) -> None:
+    """문항 MD → 강의자 톤 대본 사이드카 생성 (Q####.scene{1,2}.txt).
+
+    이후 tts/video 단계가 사이드카를 자동으로 사용해 구어체로 합성.
+    --force 면 mtime 무시하고 모든 사이드카 재생성.
+    """
+    from . import stage6a_narration
+    stage6a_narration.narrate(force=force)
 
 
 @app.command()
@@ -176,8 +192,19 @@ def list_questions() -> None:
 
 
 @app.command("run-all")
-def run_all(total: int = 50, seed: int = 20260514, skip_check: bool = False) -> None:
-    """1~7 단계를 순차 실행 (Track B만)."""
+def run_all(
+    total: int = 50,
+    seed: int = 20260514,
+    rounds: int = 1,
+    narration: bool = True,
+    skip_check: bool = False,
+) -> None:
+    """1~7 단계를 순차 실행 (Track B만).
+
+    --rounds N 으로 회차 분할 (예: --total 200 --rounds 4).
+    --narration 기본 True. 생성된 MD 를 강사 어투 대본 사이드카로 변환 후 TTS 진행.
+    --no-narration 주면 시험지 그대로 읽는 옛 자동 조립 모드.
+    """
     from . import (
         stage1_ingest,
         stage2_ocr,
@@ -185,13 +212,14 @@ def run_all(total: int = 50, seed: int = 20260514, skip_check: bool = False) -> 
         stage4b_generate,
         stage5_render,
         stage6_tts,
+        stage6a_narration,
         stage7_video,
     )
 
     stage1_ingest.ingest_all()
     stage2_ocr.ocr_all()
     stage3_topic.build_topic_map()
-    stage4b_generate.generate_bank(total=total, seed=seed)
+    stage4b_generate.generate_bank(total=total, seed=seed, rounds=rounds)
 
     if not skip_check:
         check_cmd = [sys.executable, str(PROJECT_ROOT / "tests" / "derivative_check.py")]
@@ -199,6 +227,9 @@ def run_all(total: int = 50, seed: int = 20260514, skip_check: bool = False) -> 
         if rc != 0:
             console.print("[red]derivative check failed — aborting before slide/TTS/video[/red]")
             raise SystemExit(rc)
+
+    if narration:
+        stage6a_narration.narrate()
 
     stage5_render.render_all()
     stage6_tts.synthesize_all()

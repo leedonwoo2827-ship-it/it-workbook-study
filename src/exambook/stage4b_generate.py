@@ -176,7 +176,12 @@ def _critique(q: Question, system_prompt: str) -> Question | None:
         return None
 
 
-def generate_bank(total: int = 50, seed: int = 20260514) -> Path:
+def generate_bank(total: int = 50, seed: int = 20260514, rounds: int = 1) -> Path:
+    """문항 N개를 R개 회차로 나눠서 생성.
+
+    회차당 문항 수 = total // rounds.
+    각 문항의 최종 ID 는 `Q{round}-{round_idx:02d}` (예: Q1-01, Q4-50).
+    """
     cfg = load_config()
     syllabus = _load_syllabus()
     stats_by_id = _load_topic_stats()
@@ -184,30 +189,89 @@ def generate_bank(total: int = 50, seed: int = 20260514) -> Path:
     gen_prompt = prompt_text("question_generate.ko.txt")
     crit_prompt = prompt_text("self_critique.ko.txt")
 
-    rng = random.Random(seed)
-    plan = _plan_distribution(syllabus, total)
-    console.print(f"[cyan]Plan[/cyan]: {len(plan)} topic-buckets, target total ~{total}")
+    rounds = max(1, rounds)
+    per_round = max(1, total // rounds)
 
-    bank: list[Question] = []
-    for topic, count in plan:
-        stats = stats_by_id.get(topic["topic_code"])
-        topic_seed = rng.randint(1, 1_000_000)
-        console.print(f"  [bold]{topic['topic_code']}[/bold] {topic['topic_name']} × {count}")
-        candidates = _gen_questions(topic, count, stats, gen_prompt, topic_seed)
-        for q in candidates:
-            revised = _critique(q, crit_prompt)
-            if revised:
-                bank.append(revised)
+    overall_bank: list[Question] = []
+    MAX_TOPUP_PASSES = 6
+
+    for round_n in range(1, rounds + 1):
+        rng = random.Random(seed + round_n * 9973)
+        plan = _plan_distribution(syllabus, per_round)
+        console.print(
+            f"[cyan]Round {round_n}/{rounds}[/cyan]: "
+            f"{len(plan)} topic-buckets, target {per_round}"
+        )
+        round_bank: list[Question] = []
+
+        # 1차: plan 그대로 생성
+        for topic, count in plan:
+            stats = stats_by_id.get(topic["topic_code"])
+            topic_seed = rng.randint(1, 1_000_000)
+            console.print(f"  [bold]{topic['topic_code']}[/bold] {topic['topic_name']} × {count}")
+            candidates = _gen_questions(topic, count, stats, gen_prompt, topic_seed)
+            for q in candidates:
+                revised = _critique(q, crit_prompt)
+                if revised:
+                    round_bank.append(revised)
+
+        # 2차+: 부족하면 토픽 라운드로빈으로 보충 (critique 탈락 보정용 2배 over-sample)
+        topics_only = [t for t, _ in plan]
+        topup_pass = 0
+        while len(round_bank) < per_round and topup_pass < MAX_TOPUP_PASSES:
+            topup_pass += 1
+            deficit = per_round - len(round_bank)
+            console.print(
+                f"[yellow]Round {round_n} top-up pass {topup_pass}: "
+                f"{len(round_bank)}/{per_round} (need {deficit} more)[/yellow]"
+            )
+            shuffled = list(topics_only)
+            rng.shuffle(shuffled)
+            for topic in shuffled:
+                if len(round_bank) >= per_round:
+                    break
+                remaining = per_round - len(round_bank)
+                # 토픽당 최대 2개씩만 보충, critique 탈락 대비 2배 요청
+                want = min(2, remaining)
+                request = max(2, want * 2)
+                stats = stats_by_id.get(topic["topic_code"])
+                topic_seed = rng.randint(1, 1_000_000)
+                candidates = _gen_questions(topic, request, stats, gen_prompt, topic_seed)
+                for q in candidates:
+                    if len(round_bank) >= per_round:
+                        break
+                    revised = _critique(q, crit_prompt)
+                    if revised:
+                        round_bank.append(revised)
+
+        if len(round_bank) < per_round:
+            console.print(
+                f"[red]Round {round_n}: 보충 한도 도달 — {len(round_bank)}/{per_round}[/red]"
+            )
+        # 목표 초과시 자르기
+        round_bank = round_bank[:per_round]
+
+        # 회차 내 순서대로 Q{round}-{idx:02d} ID 재부여
+        for idx, q in enumerate(round_bank, start=1):
+            data = q.model_dump()
+            data["id"] = f"Q{round_n}-{idx:02d}"
+            data["round"] = round_n
+            data["round_idx"] = idx
+            overall_bank.append(Question(**data))
+
+        console.print(f"[green]Round {round_n} bank: {len(round_bank)} questions[/green]")
 
     out_path = PROJECT_ROOT / cfg["paths"]["questions"]
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    for q in bank:
+    for q in overall_bank:
         write_question(q)
-    out_path.write_text(QuestionBank(items=bank).model_dump_json(indent=2), encoding="utf-8")
-    console.print(f"[green]Wrote {len(bank)} MD files + index {out_path}[/green]")
+    out_path.write_text(QuestionBank(items=overall_bank).model_dump_json(indent=2), encoding="utf-8")
+    console.print(
+        f"[green]Wrote {len(overall_bank)} MD files across {rounds} round(s) → {out_path.parent}[/green]"
+    )
 
-    counter = Counter(q.topic_id for q in bank)
+    counter = Counter(q.topic_id for q in overall_bank)
     console.print(f"[dim]Per-topic distribution: {dict(counter)}[/dim]")
 
     unload(TEXT_MODEL)

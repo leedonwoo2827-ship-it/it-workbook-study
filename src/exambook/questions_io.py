@@ -134,6 +134,8 @@ def read_question(qid: str) -> Question:
         generated_by=meta.get("generated_by", ""),
         self_critique_passed=bool(meta.get("self_critique_passed", False)),
         derivative_max_similarity=meta.get("derivative_max_similarity"),
+        round=meta.get("round"),
+        round_idx=meta.get("round_idx"),
     )
 
 
@@ -160,6 +162,10 @@ def write_question(q: Question, *, marked_modified: bool = False) -> Path:
         "generated_by": q.generated_by,
         "self_critique_passed": q.self_critique_passed,
     }
+    if q.round is not None:
+        meta["round"] = q.round
+    if q.round_idx is not None:
+        meta["round_idx"] = q.round_idx
     if q.derivative_max_similarity is not None:
         meta["derivative_max_similarity"] = round(q.derivative_max_similarity, 4)
     if marked_modified:

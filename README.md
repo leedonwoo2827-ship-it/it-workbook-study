@@ -25,16 +25,22 @@ python -m venv .venv
 
 ## 빠른 실행
 
-```bash
-.venv\Scripts\activate
-python -m exambook.cli doctor                  # 도구·모델 점검
-python -m exambook.cli run-all --total 50      # 전체 1회분 자동
+CMD 창 2개를 띄웁니다.
+
+### 창 A — 파이프라인 (위에서 아래로 한 줄씩, 프롬프트 복귀하면 다음 줄)
+
+```bat
+cd /d D:\00work\260514-exambook && chcp 65001 && .venv\Scripts\activate.bat && exambook generate --total 200 --rounds 4
+exambook narrate
+exambook render
+exambook tts
+exambook video
 ```
 
-문항당 편집·부분 재빌드:
+### 창 B — 웹 UI (켜두고 검수)
 
-```bash
-# data/questions/Q0042.md 직접 편집 후
-python -m exambook.cli rebuild Q0042           # 그 문항만 슬라이드→음성→영상 재생성
-python -m exambook.cli list                    # 현재 문항 목록
+```bat
+cd /d D:\00work\260514-exambook && chcp 65001 && .venv\Scripts\activate.bat && exambook serve
 ```
+
+→ http://localhost:8000

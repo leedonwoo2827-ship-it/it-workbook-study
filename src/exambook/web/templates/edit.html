@@ -173,13 +173,44 @@ function loadPreviewMedia(kind) {
       const correct = q.answer_index;
       const choices = q.choices.map((c, i) =>
         `<li class="${i === correct ? 'correct' : ''}">${c}</li>`).join('');
-      const sql = q.sql_snippet ? `<div class="preview-section-title">SQL</div><pre class="preview-sql"><code>${q.sql_snippet}</code></pre>` : '';
+
+      // stem 안의 ```...``` 펜스 코드 추출 (stage5_render 와 동일 로직)
+      const fenceRe = /```[a-zA-Z]*\n[\s\S]*?\n```/g;
+      const embeddedRaw = q.stem.match(fenceRe) || [];
+      const stemBody = q.stem.replace(fenceRe, '').trim();
+      const stripFence = (b) => {
+        const lines = b.trim().split('\n');
+        if (lines.length >= 2 && lines[0].startsWith('```') && lines[lines.length-1].startsWith('```')) {
+          return lines.slice(1, -1).join('\n').trim();
+        }
+        return b.trim();
+      };
+      // sql_snippet 과 embedded 중복 제거
+      const codes = [];
+      const seen = new Set();
+      if (q.sql_snippet) {
+        const s = q.sql_snippet.trim();
+        codes.push(s);
+        seen.add(s);
+      }
+      embeddedRaw.forEach(emb => {
+        const inner = stripFence(emb);
+        if (!seen.has(inner)) {
+          seen.add(inner);
+          codes.push(inner);
+        }
+      });
+      const sqlHtml = codes.length
+        ? `<div class="preview-section-title">SQL</div>` +
+          codes.map(c => `<pre class="preview-sql"><code>${escHtml(c)}</code></pre>`).join('')
+        : '';
+
       preview.innerHTML = `
-        <div class="preview-stem">${q.stem}</div>
-        ${sql}
+        <div class="preview-stem">${escHtml(stemBody)}</div>
+        ${sqlHtml}
         <ul class="preview-choices">${choices}</ul>
         <div class="preview-section-title">해설</div>
-        <div class="preview-explanation">${q.explanation}</div>`;
+        <div class="preview-explanation">${escHtml(q.explanation)}</div>`;
     }).catch(err => { preview.innerHTML = '<div class="empty">파싱 오류: ' + err + '</div>'; });
   }
 }

@@ -43,6 +43,10 @@ generation:
   temperature_question: 0.5
   temperature_explanation: 0.2
   derivative_similarity_threshold: 0.75
+  # CLI에서 --total / --rounds 로 덮어쓸 수 있음. 4회분 1회당 50문항이면:
+  #   exambook generate --total 200 --rounds 4
+  default_rounds: 1
+  default_questions_per_round: 50
 
 video:
   encoder: h264_nvenc

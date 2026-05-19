@@ -7,83 +7,117 @@
 <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-<div class="app">
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <div class="brand">
-        <div class="brand-dot"></div>
-        <div>Exambook Studio</div>
-      </div>
+<header class="topbar2">
+  <div class="brand">
+    <div class="brand-dot"></div>
+    <div>Exambook Studio</div>
+  </div>
+  <div class="topbar2-search">
+    <input class="search" placeholder="문항 검색 (Q1-01, 엔터티, …)" id="search">
+  </div>
+  <div class="topbar2-stats">
+    <div class="stat">
+      <div class="stat-label">문항</div>
+      <div class="stat-value">{{ summary.total }}</div>
     </div>
-    <div class="sidebar-actions">
-      <button class="btn-new" onclick="alert('terminal: exambook generate --total 50')">＋ 새 회분 생성</button>
+    <div class="stat">
+      <div class="stat-label">슬라이드</div>
+      <div class="stat-value">{{ summary.slide_done }}<span class="stat-of"> / {{ summary.total }}</span></div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width: {{ summary.slide_pct }}%"></div></div>
     </div>
-    <div class="search-wrap">
-      <input class="search" placeholder="문항 검색 (Q0042, 엔터티, …)" id="search">
+    <div class="stat">
+      <div class="stat-label">영상</div>
+      <div class="stat-value">{{ summary.video_done }}<span class="stat-of"> / {{ summary.total }}</span></div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width: {{ summary.video_pct }}%"></div></div>
     </div>
-    <div class="sidebar-list" id="sidebar-list">
-      {% for c in cards %}
-        <a class="q-item" href="/q/{{ c.id }}">
-          <div class="q-id">{{ c.id }}</div>
-          {% if c.stem_preview %}
-            <div class="q-preview">{{ c.stem_preview }}</div>
-            <div class="q-meta">{{ c.topic_id }} · 난이도 {{ c.difficulty }}</div>
-          {% else %}
-            <div class="q-preview">ERROR: {{ c.error }}</div>
-          {% endif %}
-        </a>
+  </div>
+  <div class="topbar2-actions">
+    <button class="btn-new" onclick="alert('터미널: exambook generate --total 50')">＋ 새 회분 생성</button>
+  </div>
+</header>
+
+<div class="app2">
+  <aside class="sidebar2">
+    <div class="round-nav">
+      <a class="round-link active" data-round="all" href="#">전체 <span class="round-count">{{ summary.total }}</span></a>
+      {% for g in groups %}
+        <details class="round-group" data-round="{{ g.round }}">
+          <summary>
+            <span class="round-label">{{ g.label }}</span>
+            <span class="round-count">{{ g.total }}</span>
+          </summary>
+          <div class="round-items">
+            {% for item in g.rows %}
+              <a class="round-item" href="/q/{{ item.id }}">
+                <span class="ri-id">{{ item.id }}</span>
+                <span class="ri-dots">
+                  <span class="dot {{ 'done' if item.slide_done else '' }}" title="슬라이드"></span>
+                  <span class="dot {{ 'done' if item.video_done else '' }}" title="영상"></span>
+                </span>
+              </a>
+            {% endfor %}
+          </div>
+        </details>
       {% endfor %}
     </div>
   </aside>
 
-  <main class="main">
-    <div class="topbar">
-      <div>
-        <h1>문항 라이브러리</h1>
-        <span class="meta">총 {{ cards|length }}문항</span>
-      </div>
-      <div class="toolbar">
-        <button class="btn" onclick="rebuildAll(false)">변경분 재빌드</button>
-        <button class="btn btn-primary" onclick="rebuildAll(true)">강제 전체 재빌드</button>
+  <main class="main2">
+    <div class="board-toolbar">
+      <h1>문항 라이브러리</h1>
+      <div class="board-filter">
+        <button class="chip-btn active" data-filter="all">전체</button>
+        {% for g in groups %}
+          <button class="chip-btn" data-filter="{{ g.round }}">{{ g.label }} <span class="chip-mini">{{ g.total }}</span></button>
+        {% endfor %}
       </div>
     </div>
 
-    <div class="content">
-      {% if cards %}
-        <div class="card-grid">
-          {% for c in cards %}
-            <div class="card" onclick="location.href='/q/{{ c.id }}'">
-              <div class="card-id">{{ c.id }}</div>
-              {% if c.stem_preview %}
-                <div class="card-stem">{{ c.stem_preview }}</div>
-                <div class="card-foot">
-                  <span class="chip">{{ c.topic_id }}</span>
-                  <span class="chip dim">난이도 {{ c.difficulty }}</span>
-                </div>
-              {% else %}
-                <div class="card-stem">파싱 오류</div>
-                <div class="card-foot"><span class="chip dim">{{ c.error[:40] }}</span></div>
-              {% endif %}
-            </div>
+    <div class="board">
+      <div class="board-head">
+        <div class="b-col-id">ID</div>
+        <div class="b-col-topic">토픽</div>
+        <div class="b-col-diff">난이도</div>
+        <div class="b-col-stem">문제</div>
+        <div class="b-col-status">진행</div>
+      </div>
+      <div class="board-body" id="board-body">
+        {% for g in groups %}
+          {% for item in g.rows %}
+            <a class="board-row" href="/q/{{ item.id }}" data-round="{{ g.round }}" data-search="{{ item.id }} {{ item.stem_preview or '' }} {{ item.topic_id or '' }}">
+              <div class="b-col-id"><span class="row-id">{{ item.id }}</span></div>
+              <div class="b-col-topic">{% if item.topic_id %}<span class="chip">{{ item.topic_id }}</span>{% else %}<span class="chip dim">-</span>{% endif %}</div>
+              <div class="b-col-diff">{% if item.difficulty %}<span class="diff diff-{{ item.difficulty }}">{{ item.difficulty }}</span>{% else %}-{% endif %}</div>
+              <div class="b-col-stem">{% if item.stem_preview %}{{ item.stem_preview }}{% else %}<span class="dim">파싱 오류: {{ item.error }}</span>{% endif %}</div>
+              <div class="b-col-status">
+                <span class="badge {{ 'on' if item.slide_done else '' }}">📑</span>
+                <span class="badge {{ 'on' if item.video_done else '' }}">🎬</span>
+              </div>
+            </a>
           {% endfor %}
-        </div>
-      {% else %}
-        <div class="empty">
-          <div class="empty-icon">📝</div>
-          <div>아직 생성된 문항이 없습니다.</div>
-          <div style="margin-top:8px; font-size:13px;">
-            터미널에서 <code>exambook generate --total 50</code> 을 실행해 보세요.
-          </div>
-        </div>
-      {% endif %}
+        {% endfor %}
+      </div>
     </div>
   </main>
 </div>
+
+<footer class="footbar">
+  <div class="foot-left">
+    <a href="/pronunciations" class="foot-link">발음 사전</a>
+    <span class="foot-sep">·</span>
+    <span class="foot-hint">CLI: <code>exambook serve / generate / render / tts / video</code></span>
+  </div>
+  <div class="foot-right">
+    <button class="btn" onclick="rebuildAll(false)">변경분 재빌드</button>
+    <button class="btn btn-primary" onclick="rebuildAll(true)">강제 전체 재빌드</button>
+  </div>
+</footer>
 
 <div class="toast" id="toast"></div>
 
 <script>
 const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
 const toast = $('#toast');
 function showToast(msg, kind='info') {
   toast.textContent = msg;
@@ -91,10 +125,29 @@ function showToast(msg, kind='info') {
   setTimeout(() => toast.classList.remove('show'), 2400);
 }
 
-document.getElementById('search').addEventListener('input', e => {
-  const q = e.target.value.toLowerCase();
-  document.querySelectorAll('.q-item').forEach(el => {
-    el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+let currentFilter = 'all';
+let currentSearch = '';
+
+function applyFilters() {
+  const q = currentSearch.toLowerCase();
+  $$('.board-row').forEach(el => {
+    const matchRound = currentFilter === 'all' || el.dataset.round === currentFilter;
+    const matchSearch = !q || el.dataset.search.toLowerCase().includes(q);
+    el.style.display = (matchRound && matchSearch) ? '' : 'none';
+  });
+}
+
+$('#search').addEventListener('input', e => {
+  currentSearch = e.target.value;
+  applyFilters();
+});
+
+$$('.chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.chip-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    applyFilters();
   });
 });
 
